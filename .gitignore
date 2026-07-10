@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+test_env/
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Internal planning docs (not part of the public sample)
+docs/
+
+# Data
+*.csv
+faiss-db/
+data/
+*.index
+vector_store/
+graph-db/
+sessions/
+
+# Jupyter
+.ipynb_checkpoints/
+*_executed.ipynb
+
+# IDE
+.idea/
+.vscode/
+.kiro/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Credentials
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+*.pkl

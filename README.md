@@ -19,6 +19,7 @@ These demos use Strands Agents for implementation. The memory patterns demonstra
 | [02 - Core Memory Pattern](02-core-memory-demo/) | Give the agent explicit tools to manage its own memory: read, write, update, list. Agent decides what to remember (MIRIX/MemGPT pattern). | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-core_memory-blue) |
 | [03 - Memory Retrieval](03-memory-retrieval-demo/) | When memory grows large, compare dump-all vs keyword vs semantic retrieval. Semantic search uses 60-98% fewer tokens. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-semantic_search-blue) |
 | [04 - Graph Memory](04-graph-memory-demo/) | Semantic memory can't reason over relationships. Store memories as a Neo4j knowledge graph and traverse it to answer multi-hop questions: before 1/4, after 4/4. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-tools+state-blue) |
+| [06 - Memory Hygiene](06-memory-hygiene-demo/) | What an agent should NOT remember. A write-gate blocks poisoned/injected content; forget removes it. One poisoned fact contaminates 1 answer in key-value memory but 4/4 in a graph. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-write_gate-blue) |
 
 ---
 
@@ -109,6 +110,21 @@ agent = Agent(
 
 ---
 
+### Demo 06: Memory Hygiene — What an Agent Should NOT Remember
+
+**Research:** [AgentPoison](https://arxiv.org/abs/2407.12784) (2024) · [PoisonedRAG](https://arxiv.org/abs/2402.07867) (USENIX Security 2025)
+
+Poisoned or injected content that reaches long-term memory persists across sessions and corrupts future answers. Defend at the **write path** (screen before storing) and **forget** what already got in. The same attack has a very different blast radius depending on the store:
+
+| Backend | Poisoned | Gated (write-gate) | Cleaned (forget) |
+|---------|----------|--------------------|------------------|
+| Key-value (`agent.state`) | 1/4 | 0/4 | 0/4 |
+| Graph (Neo4j) | 4/4 | 0/4 | 0/4 |
+
+One poisoned fact contaminates every multi-hop answer that traverses it — so graph memory is more powerful *and* more sensitive to poisoning.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -137,6 +153,8 @@ You can use different AI model providers (like Amazon Bedrock or Anthropic Claud
 | [GAAMA: Graph Augmented Associative Memory for Agents](https://arxiv.org/abs/2603.27910) | Concept-mediated knowledge graph + kNN/PageRank retrieval | 04 |
 | [MAGMA: A Multi-Graph based Agentic Memory Architecture](https://arxiv.org/abs/2601.03236) | Semantic/temporal/causal/entity graphs + policy-guided traversal | 04 |
 | [GRAVITY: Structured Anchoring for Long-Horizon Memory](https://arxiv.org/abs/2605.01688) | Entity profiles grounded in relational graphs | 04 |
+| [AgentPoison](https://arxiv.org/abs/2407.12784) | >80% attack success poisoning <0.1% of agent memory | 06 |
+| [PoisonedRAG](https://arxiv.org/abs/2402.07867) | ~90% attack success with 5 malicious texts (USENIX Security 2025) | 06 |
 
 ---
 

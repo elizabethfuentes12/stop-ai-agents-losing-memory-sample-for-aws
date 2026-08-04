@@ -48,3 +48,6 @@ Thumbs.db
 # Logs
 *.log
 *.pkl
+
+# Claude Code local config
+.claude/

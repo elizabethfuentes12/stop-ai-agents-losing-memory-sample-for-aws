@@ -1,0 +1,621 @@
+{
+ "_captured_on": "2026-07-17",
+ "JFK-CDG": [
+  {
+   "offer_id": "off_0000B8RDIqHocPT2qVhgTy",
+   "price": 226.32,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "CDG",
+     "segments": [
+      {
+       "carrier": "Duffel Airways",
+       "flight_number": "5217",
+       "departing_at": "2026-09-15T10:50:00",
+       "arriving_at": "2026-09-16T01:11:00",
+       "duration": "PT8H21M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDIqHocPT2qVhgU1",
+   "price": 231.54,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "CDG",
+     "segments": [
+      {
+       "carrier": "Iberia",
+       "flight_number": "3179",
+       "departing_at": "2026-09-15T10:50:00",
+       "arriving_at": "2026-09-16T01:11:00",
+       "duration": "PT8H21M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDIqIWZm2Csi2FaX",
+   "price": 235.79,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "CDG",
+     "segments": [
+      {
+       "carrier": "British Airways",
+       "flight_number": "0109",
+       "departing_at": "2026-09-15T10:50:00",
+       "arriving_at": "2026-09-16T01:11:00",
+       "duration": "PT8H21M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDIqIWZm2Csi2FaU",
+   "price": 241.84,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "CDG",
+     "segments": [
+      {
+       "carrier": "American Airlines",
+       "flight_number": "4",
+       "departing_at": "2026-09-15T10:50:00",
+       "arriving_at": "2026-09-16T01:11:00",
+       "duration": "PT8H21M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDIxqoUgccJ58EVx",
+   "price": 399.0,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "CDG",
+     "segments": [
+      {
+       "carrier": "Air Serbia",
+       "flight_number": "0501",
+       "departing_at": "2026-09-15T13:50:00",
+       "arriving_at": "2026-09-16T04:40:00",
+       "duration": "PT8H50M"
+      },
+      {
+       "carrier": "Air Serbia",
+       "flight_number": "0242",
+       "departing_at": "2026-09-16T17:05:00",
+       "arriving_at": "2026-09-16T19:45:00",
+       "duration": "PT2H40M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDIxpOZxUIEgT6Ie",
+   "price": 401.1,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "CDG",
+     "segments": [
+      {
+       "carrier": "Icelandair",
+       "flight_number": "0614",
+       "departing_at": "2026-09-15T20:30:00",
+       "arriving_at": "2026-09-16T06:20:00",
+       "duration": "PT5H50M"
+      },
+      {
+       "carrier": "Icelandair",
+       "flight_number": "0542",
+       "departing_at": "2026-09-16T07:35:00",
+       "arriving_at": "2026-09-16T13:00:00",
+       "duration": "PT3H25M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDIxpOZxUIEgT6Il",
+   "price": 401.1,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "CDG",
+     "segments": [
+      {
+       "carrier": "Icelandair",
+       "flight_number": "0618",
+       "departing_at": "2026-09-15T23:10:00",
+       "arriving_at": "2026-09-16T08:55:00",
+       "duration": "PT5H45M"
+      },
+      {
+       "carrier": "Icelandair",
+       "flight_number": "0546",
+       "departing_at": "2026-09-16T10:50:00",
+       "arriving_at": "2026-09-16T16:15:00",
+       "duration": "PT3H25M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDIxqoUgccJ58EW4",
+   "price": 434.0,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "CDG",
+     "segments": [
+      {
+       "carrier": "Air Serbia",
+       "flight_number": "0501",
+       "departing_at": "2026-09-15T13:50:00",
+       "arriving_at": "2026-09-16T04:40:00",
+       "duration": "PT8H50M"
+      },
+      {
+       "carrier": "Air Serbia",
+       "flight_number": "0240",
+       "departing_at": "2026-09-16T06:35:00",
+       "arriving_at": "2026-09-16T09:15:00",
+       "duration": "PT2H40M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  }
+ ],
+ "CDG-HND": [
+  {
+   "offer_id": "off_0000B8RDJ3r8fqDyclCkba",
+   "price": 361.1,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "CDG",
+     "destination": "HND",
+     "segments": [
+      {
+       "carrier": "Duffel Airways",
+       "flight_number": "5217",
+       "departing_at": "2026-09-22T16:15:00",
+       "arriving_at": "2026-09-23T12:46:00",
+       "duration": "PT13H31M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJ3rqdCn8exXJhZ",
+   "price": 365.26,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "CDG",
+     "destination": "HND",
+     "segments": [
+      {
+       "carrier": "British Airways",
+       "flight_number": "0109",
+       "departing_at": "2026-09-22T16:15:00",
+       "arriving_at": "2026-09-23T12:46:00",
+       "duration": "PT13H31M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJ3rUeWVYdrN29j",
+   "price": 377.5,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "CDG",
+     "destination": "HND",
+     "segments": [
+      {
+       "carrier": "Iberia",
+       "flight_number": "3179",
+       "departing_at": "2026-09-22T16:15:00",
+       "arriving_at": "2026-09-23T12:46:00",
+       "duration": "PT13H31M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJ3sYaZMIh9rso7",
+   "price": 381.06,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "CDG",
+     "destination": "HND",
+     "segments": [
+      {
+       "carrier": "American Airlines",
+       "flight_number": "4",
+       "departing_at": "2026-09-22T16:15:00",
+       "arriving_at": "2026-09-23T12:46:00",
+       "duration": "PT13H31M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJMGGFB0zht64Gc",
+   "price": 673.5,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "CDG",
+     "destination": "HND",
+     "segments": [
+      {
+       "carrier": "China Southern Airlines",
+       "flight_number": "0348",
+       "departing_at": "2026-09-22T12:10:00",
+       "arriving_at": "2026-09-23T05:50:00",
+       "duration": "PT11H40M"
+      },
+      {
+       "carrier": "China Southern Airlines",
+       "flight_number": "0385",
+       "departing_at": "2026-09-23T08:50:00",
+       "arriving_at": "2026-09-23T14:20:00",
+       "duration": "PT4H30M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJMC0Uzc1Uh6feW",
+   "price": 709.9,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "CDG",
+     "destination": "HND",
+     "segments": [
+      {
+       "carrier": "China Eastern Airlines",
+       "flight_number": "0570",
+       "departing_at": "2026-09-22T21:20:00",
+       "arriving_at": "2026-09-23T14:40:00",
+       "duration": "PT11H20M"
+      },
+      {
+       "carrier": "China Eastern Airlines",
+       "flight_number": "0575",
+       "departing_at": "2026-09-23T17:15:00",
+       "arriving_at": "2026-09-23T21:20:00",
+       "duration": "PT3H5M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJMCMTftbVnGxBe",
+   "price": 709.9,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "CDG",
+     "destination": "HND",
+     "segments": [
+      {
+       "carrier": "China Eastern Airlines",
+       "flight_number": "0554",
+       "departing_at": "2026-09-22T13:25:00",
+       "arriving_at": "2026-09-23T07:00:00",
+       "duration": "PT11H35M"
+      },
+      {
+       "carrier": "China Eastern Airlines",
+       "flight_number": "8633",
+       "departing_at": "2026-09-23T12:00:00",
+       "arriving_at": "2026-09-23T15:50:00",
+       "duration": "PT2H50M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJMKry2hXwBFkRR",
+   "price": 796.9,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "CDG",
+     "destination": "HND",
+     "segments": [
+      {
+       "carrier": "China Eastern Airlines",
+       "flight_number": "0570",
+       "departing_at": "2026-09-22T21:20:00",
+       "arriving_at": "2026-09-23T14:40:00",
+       "duration": "PT11H20M"
+      },
+      {
+       "carrier": "China Eastern Airlines",
+       "flight_number": "0575",
+       "departing_at": "2026-09-23T17:15:00",
+       "arriving_at": "2026-09-23T21:20:00",
+       "duration": "PT3H5M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  }
+ ],
+ "HND-JFK": [
+  {
+   "offer_id": "off_0000B8RDJP4YZZowA7ipOP",
+   "price": 403.56,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "HND",
+     "destination": "JFK",
+     "segments": [
+      {
+       "carrier": "Iberia",
+       "flight_number": "3179",
+       "departing_at": "2026-10-01T00:00:00",
+       "arriving_at": "2026-10-01T02:05:00",
+       "duration": "PT15H5M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJP3UdWyC6pDyja",
+   "price": 411.68,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "HND",
+     "destination": "JFK",
+     "segments": [
+      {
+       "carrier": "Duffel Airways",
+       "flight_number": "5217",
+       "departing_at": "2026-10-01T00:00:00",
+       "arriving_at": "2026-10-01T02:05:00",
+       "duration": "PT15H5M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJP3qcDFm7vOGHq",
+   "price": 417.47,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "HND",
+     "destination": "JFK",
+     "segments": [
+      {
+       "carrier": "American Airlines",
+       "flight_number": "4",
+       "departing_at": "2026-10-01T00:00:00",
+       "arriving_at": "2026-10-01T02:05:00",
+       "duration": "PT15H5M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJP4YZZowA7ipOM",
+   "price": 426.71,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "HND",
+     "destination": "JFK",
+     "segments": [
+      {
+       "carrier": "British Airways",
+       "flight_number": "0109",
+       "departing_at": "2026-10-01T00:00:00",
+       "arriving_at": "2026-10-01T02:05:00",
+       "duration": "PT15H5M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJgezBO3si1tf2m",
+   "price": 730.83,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "HND",
+     "destination": "JFK",
+     "segments": [
+      {
+       "carrier": "Philippine Airlines",
+       "flight_number": "0421",
+       "departing_at": "2026-10-01T14:55:00",
+       "arriving_at": "2026-10-01T18:50:00",
+       "duration": "PT4H55M"
+      },
+      {
+       "carrier": "Philippine Airlines",
+       "flight_number": "0126",
+       "departing_at": "2026-10-01T19:45:00",
+       "arriving_at": "2026-10-01T23:20:00",
+       "duration": "PT15H35M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJgdDHydycX4FHS",
+   "price": 857.63,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "HND",
+     "destination": "JFK",
+     "segments": [
+      {
+       "carrier": "ANA",
+       "flight_number": "0837",
+       "departing_at": "2026-10-01T11:00:00",
+       "arriving_at": "2026-10-01T16:30:00",
+       "duration": "PT9H"
+      },
+      {
+       "carrier": "Air India",
+       "flight_number": "0101",
+       "departing_at": "2026-10-02T02:20:00",
+       "arriving_at": "2026-10-02T09:40:00",
+       "duration": "PT16H50M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJgezBO3si1tf2t",
+   "price": 904.63,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "HND",
+     "destination": "JFK",
+     "segments": [
+      {
+       "carrier": "Korean Air",
+       "flight_number": "0752",
+       "departing_at": "2026-10-01T02:00:00",
+       "arriving_at": "2026-10-01T04:35:00",
+       "duration": "PT2H35M"
+      },
+      {
+       "carrier": "Asiana Airlines",
+       "flight_number": "0222",
+       "departing_at": "2026-10-01T08:30:00",
+       "arriving_at": "2026-10-01T10:00:00",
+       "duration": "PT14H30M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000B8RDJgfLA4LSj83wb6",
+   "price": 904.63,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "HND",
+     "destination": "JFK",
+     "segments": [
+      {
+       "carrier": "Korean Air",
+       "flight_number": "0752",
+       "departing_at": "2026-10-01T02:00:00",
+       "arriving_at": "2026-10-01T04:35:00",
+       "duration": "PT2H35M"
+      },
+      {
+       "carrier": "Asiana Airlines",
+       "flight_number": "0224",
+       "departing_at": "2026-10-01T21:05:00",
+       "arriving_at": "2026-10-01T23:00:00",
+       "duration": "PT14H55M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  }
+ ]
+}

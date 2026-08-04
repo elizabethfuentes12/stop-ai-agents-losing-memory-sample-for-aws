@@ -6,23 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Research-backed demos showing why AI agents lose memory and how to fix it using Strands Agents. Part of the larger `sample-why-agents-fail` monorepo (sibling folders: `stop-ai-agent-hallucinations`, `stop-ai-agents-wasting-tokens`).
 
-Three progressive demos: memory decay → core memory pattern → semantic retrieval.
+Progressive demo series: key-value memory → vector memory → graph memory → selective memory → memory hygiene → reasoning memory → hybrid memory (design) → production deploy (pending).
 
 ## Commands
 
 ```bash
 # Run a demo (from its directory)
 # Using uv — a fast Python package manager (https://docs.astral.sh/uv/)
-cd 01-memory-decay-demo
+cd 01-key-value-memory-demo
 uv venv && uv pip install -r requirements.txt
-uv run python test_memory_decay.py
+uv run python test_key_value_memory.py
 
 # Run any demo the same way
-cd 02-core-memory-demo && uv run python test_core_memory.py
-cd 03-memory-retrieval-demo && uv run python test_memory_retrieval.py
+cd 04-selective-memory-demo && uv run python test_selective_memory.py
+cd 02-vector-memory-demo && uv run python test_vector_memory.py
 
 # Generate charts (requires matplotlib)
-cd 01-memory-decay-demo/images && python3 generate_chart.py
+cd 01-key-value-memory-demo/images && python3 generate_chart.py
 
 # Syntax check all Python files
 python3 -c "import ast; ast.parse(open('tools.py').read())"
@@ -32,7 +32,7 @@ Each demo is self-contained with its own `requirements.txt`. There is no shared 
 
 ## Architecture
 
-### Demo Pattern (consistent across all 3 demos)
+### Demo Pattern (consistent across all demos)
 
 Each demo follows the same structure inherited from the sibling `stop-ai-agents-wasting-tokens` project:
 
@@ -49,13 +49,15 @@ All demos use the OpenAI-compatible interface via Strands SDK:
 from strands import Agent, tool, ToolContext
 from strands.models.openai import OpenAIModel
 from strands.agent.conversation_manager import SlidingWindowConversationManager
-from strands.session import FileSessionManager
+from strands.session import FileSessionManager, S3SessionManager
 ```
 
 Key state mechanisms:
-- `agent.state.set(key, value)` / `.get(key)` — per-agent key-value store (Demo 01, 02, 03)
-- `FileSessionManager(session_id, storage_dir)` — persists state across agent restarts (Demo 01 test 3, Demo 02 test 4)
+- `agent.messages` — conversation history, kept between calls on the same Agent instance and sent to the model every turn. NOT durable memory: unstructured, trimmed by conversation managers, gone on restart. Never describe an in-process agent as "forgetting between turns".
+- `agent.state.set(key, value)` / `.get(key)` — per-agent key-value store, invisible to the model, read/written by tools (used across most demos)
+- `FileSessionManager(session_id, storage_dir)` / `S3SessionManager(session_id, bucket, prefix)` — persist state across agent restarts (Demo 01 tests 3-4)
 - `SlidingWindowConversationManager(window_size=N)` — limits conversation history length
+- `HookProvider` hooks — record decision traces without touching tools (Demo 06)
 
 ### How Tools Access Memory
 
@@ -63,7 +65,7 @@ Tools use `@tool(context=True)` to receive a `ToolContext` parameter, which prov
 
 ### Demo Data
 
-All demos use a shared hotel domain (travel assistant). Demo 03 seeds 8 memory sections via `seed_memory()` in `tools.py` to simulate a user with rich history.
+All demos share a flights domain (travel assistant): live Duffel sandbox offers via `flights_api.py` (with `fallback_offers.json` captured once for offline resilience) and real Open-Meteo climate data via `weather_api.py`. A brand-new user starts with empty memory; demos that need pre-existing memories seed them explicitly (e.g. `seed_memory()` in demo 05).
 
 ### Teaching Pattern
 

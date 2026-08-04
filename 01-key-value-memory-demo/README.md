@@ -28,6 +28,8 @@ A brand-new user arrives with **empty memory** and talks to a flight assistant. 
 - After a restart (every new process or request in production), the memory-less agent answers the same question generically — everything it "knew" died with the transcript
 - Users expect personalization across sessions — repeating preferences to a returning-user assistant is frustrating
 
+![Why AI agents forget after a restart: within a session the transcript carries the preference, after a restart only agent.state with a session manager survives](images/ai-agent-transcript-vs-state-restart.jpg)
+
 The APIs are scenery: **the experiment is where memory lives**, and that's the only variable that changes between tests.
 
 ---
@@ -171,6 +173,8 @@ def book_flight(offer_id: str, tool_context: ToolContext) -> str:
     prefs["prefers_nonstop"] = all(s["stops"] == 0 for s in offer["slices"])
     tool_context.agent.state.set("user_preferences", prefs)
 ```
+
+![An AI agent learning user preferences from a booking action instead of a form: the chosen flight offer flows through the book_flight tool into a structured user_preferences profile in agent.state](images/ai-agent-learns-preferences-from-actions.jpg)
 
 Tool docstrings follow the research-backed pattern ([ToolLLM](https://arxiv.org/abs/2307.16789), [AgentTuning](https://arxiv.org/abs/2310.12823)): first sentence says *when* to use the tool, trigger phrases listed, return shape documented — so the system prompt never has to re-describe the tools.
 

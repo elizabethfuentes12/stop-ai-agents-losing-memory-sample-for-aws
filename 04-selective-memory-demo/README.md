@@ -35,9 +35,9 @@ Planted ground truth: **5 keepers** (2 facts, 2 preferences, 1 episode) and **3 
 
 | Mechanism | Kept | Decoys leaked | Turn overhead | Available after | Extra cost |
 |-----------|------|---------------|---------------|-----------------|------------|
-| A — agent tools | 4/5 | 0 | ~1.4-1.7 s/turn (selection inside the turn) | immediately | none |
+| A — agent tools | 4/5 | 0 | ~1.4-2.4 s/turn (selection inside the turn) | immediately | none |
 | B — own extractor + S3V | **5/5** | 0 | **0 — off-path** | ~4 s/turn | ~2k tokens / 6 turns |
-| C — AgentCore managed | 5/5* | 2* | ~0.4 s/turn (`create_event` only) | **~53 s** (measured) | managed pricing |
+| C — AgentCore managed | 5/5* | 0-2* | ~0.4 s/turn (`create_event` only) | **~53-85 s** (measured across runs) | managed pricing |
 
 \* C's extraction is nondeterministic — across runs it kept 4-5/5 and leaked 0-2 decoys. The built-in criteria aren't yours to tune; that's part of the trade-off.
 
@@ -125,7 +125,7 @@ Each prompt runs against each raw turn, off the conversation path. `NOTHING` is 
 - A memory in `CREATING` status can't be deleted — wait for `ACTIVE`.
 - Write path: `create_event(payload=[{"conversational": {"content": {"text": ...}, "role": "USER"}}])`.
 - Retrieval namespaces: `/strategies/{strategyId}/actors/{actorId}/` — summary and episodic records live under `/sessions/{sessionId}/`.
-- Extraction lag measured at ~53 s for this conversation.
+- Extraction lag measured between ~53 s and ~85 s across runs of this conversation.
 
 ---
 

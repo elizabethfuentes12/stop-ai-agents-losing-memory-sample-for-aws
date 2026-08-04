@@ -16,9 +16,9 @@ These demos use Strands Agents for implementation. The memory patterns demonstra
 | Demo | Description | Stack |
 |------|-------------|-------|
 | [01 - Key-Value Memory](01-key-value-memory-demo/) | Stop your agent from forgetting user preferences: the same 3-turn conversation climbing the durability ladder — no memory → `agent.state` → local disk → Amazon S3. Real flight data (Duffel); the only variable is where memory lives. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-agent.state-blue) |
-| [02 - Vector Memory](02-vector-memory-demo/) | Do you need a vector database for agent memory? FAISS (in-process, ~0.05 ms, dies with the process) vs Amazon S3 Vectors (managed, ~200 ms, survives restarts) — same Titan embeddings, measured. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![Strands](https://img.shields.io/badge/Strands-memory-blue) |
+| [02 - Vector Memory](02-vector-memory-demo/) | Do you need a vector database for agent memory? FAISS (in-process, <0.1 ms, dies with the process) vs Amazon S3 Vectors (managed, ~200 ms, survives restarts) — same Titan embeddings, measured. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![Strands](https://img.shields.io/badge/Strands-memory-blue) |
 | [03 - Graph Memory](03-graph-memory-demo/) | Vector memory can't reason over relationships. Store memories as a Neo4j knowledge graph and traverse it to answer multi-hop questions: before 1/4, after 4/4. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-tools+state-blue) |
-| [04 - Selective Memory](04-selective-memory-demo/) | What should your agent actually remember? Three selection mechanisms measured: agent tools (inline), your own 4-prompt extractor to S3 Vectors, and AgentCore's built-in strategies — keep/discard quality, turn overhead, and the ~53 s managed extraction lag nobody publishes. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-core_memory-blue) |
+| [04 - Selective Memory](04-selective-memory-demo/) | What should your agent actually remember? Three selection mechanisms measured: agent tools (inline), your own 4-prompt extractor to S3 Vectors, and AgentCore's built-in strategies — keep/discard quality, turn overhead, and the ~53-85 s managed extraction lag nobody publishes. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-core_memory-blue) |
 | [05 - Memory Hygiene](05-memory-hygiene-demo/) | What an agent should NOT remember. A write-gate blocks poisoned/injected content; forget removes it. One poisoned fact contaminates 1 answer in key-value memory but 4/4 in a graph. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-write_gate-blue) |
 | [06 - Reasoning Memory](06-reasoning-memory-demo/) | Remember WHY the agent decided, not just what it knows. A HookProvider records decision traces automatically; the reverse audit finds 2/4 affected decisions with a flat scan vs 4/4 with a graph traversal. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-provenance-blue) ![Strands](https://img.shields.io/badge/Strands-hooks-blue) |
 | 07 - Hybrid Memory | *In design.* Two memories, one agent: vector + graph combined (GAAMA pattern), with S3 Vectors-built-by-hand vs AgentCore-managed at full parity. | ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![AgentCore](https://img.shields.io/badge/Bedrock-AgentCore_Memory-orange) ![Neo4j](https://img.shields.io/badge/Neo4j-graph-blue) |
@@ -61,7 +61,7 @@ The traveler asks *"what should I avoid eating on this trip?"* — the answer is
 | Store | Finds the answer | Query latency | Survives restart |
 |-------|------------------|---------------|------------------|
 | Key-value (keyword scan) | No | — | with a session manager |
-| FAISS (in-process) | Yes | ~0.05 ms | No |
+| FAISS (in-process) | Yes | <0.1 ms | No |
 | Amazon S3 Vectors (managed) | Yes | ~170-200 ms | Yes (verified) |
 
 The honest footnote: embedding the question (~0.5 s with Titan V2) dominates and costs the same for both backends.
@@ -102,9 +102,9 @@ A planted conversation carries 5 items worth keeping (facts, preferences, an epi
 
 | Mechanism | Kept | Decoys leaked | Turn overhead | Available after |
 |-----------|------|---------------|---------------|-----------------|
-| A — agent tools (inline, `agent.state`) | 4/5 | 0 | ~1.5 s/turn | immediately |
+| A — agent tools (inline, `agent.state`) | 4/5 | 0 | ~1.5-2.5 s/turn | immediately |
 | B — own 4-prompt extractor → S3 Vectors | **5/5** | 0 | 0 (off-path) | ~4 s/turn |
-| C — AgentCore built-in strategies | 5/5* | 0-2* | ~0.4 s/turn | **~53 s (measured)** |
+| C — AgentCore built-in strategies | 5/5* | 0-2* | ~0.4 s/turn | **~53-85 s (measured)** |
 
 \* C is nondeterministic run to run — its criteria aren't yours to tune; that's the trade-off. B is "AgentCore built by hand": same pipeline, same per-type partitioning, but you own the prompts.
 

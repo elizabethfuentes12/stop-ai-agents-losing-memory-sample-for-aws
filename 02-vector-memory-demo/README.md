@@ -15,7 +15,7 @@ This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python), [
 | Store | Finds the answer | Query latency | Survives restart |
 |-------|------------------|---------------|------------------|
 | Key-value (keyword scan) | **No** — no shared words | — | with a session manager |
-| FAISS (in-process) | Yes | **~0.05 ms** | **No** — RAM index dies with the process |
+| FAISS (in-process) | Yes | **<0.1 ms** | **No** — RAM index dies with the process |
 | S3 Vectors (managed storage) | Yes | **~170-200 ms** | **Yes** — verified with a fresh client |
 
 Plus the honest footnote most posts skip: **embedding the question dominates** (~0.5 s with Titan V2), and it costs the same for both backends.

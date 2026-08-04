@@ -43,6 +43,8 @@ The APIs are scenery: **the experiment is where memory lives**, and that's the o
 | **3. Persistent** | + `FileSessionManager` (local disk) | Yes | Yes | Yes |
 | **4. Cloud** | + `S3SessionManager` (Amazon S3) | Yes | Yes | Yes |
 
+![The durability ladder for AI agent key-value memory: transcript only dies on restart, agent.state adds a structured profile, FileSessionManager persists it to disk, S3SessionManager persists it to the cloud](images/ai-agent-memory-durability-ladder-state-file-s3.jpg)
+
 ---
 
 ## Quick Start

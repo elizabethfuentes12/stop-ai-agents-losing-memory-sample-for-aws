@@ -10,8 +10,10 @@ The dividing line between Demo 01 and this demo:
 Two vector backends, same embeddings, same memories — so the measured difference
 is the backend, not the data:
 
-  - FAISS (in-process): the index lives in RAM. Microsecond queries, zero
-    infrastructure — and it dies with the Python process.
+  - FAISS (in-process): the index lives in RAM during the process. FAISS supports
+    saving the index to disk (faiss.write_index / faiss.read_index), but this demo
+    does not persist it — the index is rebuilt from scratch each run. Microsecond
+    queries, zero infrastructure.
   - Amazon S3 Vectors (managed storage): the index lives in a vector bucket.
     You create the bucket + index (this module self-provisions both if missing),
     write with put_vectors, query with query_vectors. It survives restarts and

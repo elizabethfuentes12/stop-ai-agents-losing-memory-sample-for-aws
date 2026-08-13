@@ -1,8 +1,8 @@
-# Do You Need a Vector Database for AI Agent Memory? FAISS vs Amazon S3 Vectors
+# AI Agent Memory: Add Semantic Search Without a Vector Database
 
 **Problem:** Key-value memory (Demo 01) is perfect when you know the key. But users ask by *meaning*: "what should I avoid eating on this trip?" — the answer sits under `dietary_notes`, and the question names no key and shares no words with the stored note.
 
-**Solution:** Vector memory — embed each memory once, embed the question, retrieve by similarity. Then the real decision devs search for: **in-process index (FAISS) or managed vector storage (Amazon S3 Vectors)?** This demo measures both with the same embeddings and the same memories, so the difference is the backend, not the data.
+**Solution:** Semantic search — embed each memory once at write time, embed the question at query time, retrieve by cosine similarity. Then the real decision: **in-process index (FAISS) or managed vector storage (Amazon S3 Vectors)?** This demo measures both with the same embeddings and the same memories, so the only variable is the backend.
 
 This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python), [FAISS](https://github.com/facebookresearch/faiss), [Amazon S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el), and [Amazon Titan Text Embeddings V2](https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el). The patterns are framework-agnostic and carry over to other agent frameworks.
 
@@ -12,22 +12,41 @@ This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python), [
 
 ### The measured result
 
-| Store | Finds the answer | Query latency | Survives restart |
-|-------|------------------|---------------|------------------|
-| Key-value (keyword scan) | **No** — no shared words | — | with a session manager |
-| FAISS (in-process) | Yes | **<0.1 ms** | **No** — RAM index dies with the process |
-| S3 Vectors (managed storage) | Yes | **~170-200 ms** | **Yes** — verified with a fresh client |
+| Store | Finds the answer | Similarity score | Query latency |
+|-------|:----------------:|:----------------:|:-------------:|
+| Key-value (keyword scan) | **No** — no shared words | — | — |
+| FAISS (in-process) | **Yes** | **0.231** | **<0.1 ms** |
+| S3 Vectors (managed storage) | **Yes** | **0.231** | **~195 ms** |
 
-Plus the honest footnote most posts skip: **embedding the question dominates** (~0.5 s with Titan V2), and it costs the same for both backends.
+FAISS and S3 Vectors return the same answer with the same score — accuracy is identical. The embedding call (~510 ms with Titan V2) dominates end-to-end latency for both.
+
+![Semantic search flow: embedding the question takes ~510 ms for both backends, then FAISS queries in 0.09 ms (dies on restart) and S3 Vectors in 195 ms (survives with 10/10 vectors)](images/ai-agent-faiss-vs-s3-vectors-tradeoff.png)
+
+### Vector store comparison
+
+| | FAISS | Amazon S3 Vectors | Dedicated vector database |
+|---|---|---|---|
+| **Type** | In-process library | AWS vector storage | Full database engine |
+| **Examples** | — | — | OpenSearch, Qdrant, Weaviate, Milvus, pgvector, Chroma |
+| **Semantic accuracy** | ✅ same | ✅ same | ✅ same |
+| **Infrastructure** | None — pip install | None — fully managed | Self-hosted or managed |
+| **Max vectors** | RAM-bound | Up to 2 billion per index | Depends on deployment |
+| **Query latency** | ~0.09 ms | ~195 ms | Sub-10 ms at high QPS |
+| **Embedding cost** | +~510 ms | +~510 ms | +~510 ms |
+| **Hybrid search** | ❌ | ❌ | ✅ most support it |
+| **Best for** | Prototype / local agent | Cloud agent, infrequent queries | High QPS, advanced filtering, production search |
 
 ### The decision table
 
 | You need | Pick | Why |
 |----------|------|-----|
 | Facts under known keys (profile, prefs) | Key-value ([Demo 01](../01-key-value-memory-demo/)) | Exact and instant — don't pay embeddings for lookups |
-| Search by meaning, single process / prototype | **FAISS** | Microsecond queries, zero infrastructure |
-| Search by meaning, persistent / shared | **S3 Vectors** | Nothing to administer, survives restarts, reachable from any process |
+| Semantic search, local / prototype | **FAISS** | Zero infrastructure, pip install, in-process |
+| Semantic search, cloud / infrequent queries | **S3 Vectors** | Purpose-built AWS vector storage, subsecond latency, up to 2B vectors |
+| High QPS, hybrid search, or advanced filtering | **Dedicated vector DB** | OpenSearch, Qdrant, Weaviate, Milvus, pgvector, Chroma |
 | Multi-hop questions over relationships | Graph ([Demo 03](../03-graph-memory-demo/)) | Similarity can't follow edges |
+
+![One question hitting agent memory two ways: the keyword scan misses because no words match, vector similarity finds the allergy note by meaning](images/ai-agent-key-value-miss-vector-hit.png)
 
 ---
 
@@ -116,9 +135,9 @@ client.query_vectors(..., queryVector={"float32": qv}, topK=3,
 
 ## Key Concepts
 
-### When vector memory earns its keep
+### When semantic search earns its keep
 
-For 10 memories, dump-all is still cheap (~650 chars). Vector memory pays off as memory **grows**: hundreds of notes means thousands of tokens per question with dump-all, while semantic top-3 stays constant. The retrieval cost that doesn't shrink: **embedding the question** (~0.5 s with Titan V2) — budget for it in latency-sensitive paths regardless of backend.
+For 10 memories, dump-all is still cheap (~650 chars). Semantic search pays off as memory **grows**: hundreds of notes means thousands of tokens per question with dump-all, while semantic top-3 stays constant. The retrieval cost that doesn't shrink: **embedding the question** (~0.5 s with Titan V2) — budget for it in latency-sensitive paths regardless of backend.
 
 ### Multi-tenant production note
 
@@ -128,10 +147,10 @@ For SaaS memory on S3 Vectors with per-tenant isolation (one index per tenant, I
 
 ## Learning Objectives
 
-1. Recognize the key-vs-meaning dividing line between key-value and vector memory
+1. Recognize the key-vs-meaning dividing line between key-value memory and vector-backed semantic search
 2. Build an in-process vector index (FAISS) over agent memories with real embeddings
 3. Use Amazon S3 Vectors end-to-end: create bucket/index, `put_vectors`, `query_vectors`
-4. Measure what actually differs — query latency, persistence, and the embedding cost both share
+4. Measure what matters: semantic search retrieves the answer keyword scan misses — then compare the two vector backends by query latency and the embedding cost both share
 5. Write recall tools whose docstrings let the agent choose the right one per question
 
 ---
@@ -176,7 +195,7 @@ Contributions are welcome! See [CONTRIBUTING](../CONTRIBUTING.md) for more infor
 
 ## Security
 
-If you discover a potential security issue in this project, notify AWS/Amazon Security via the [vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public GitHub issue.
+If you discover a potential security issue in this project, notify AWS/Amazon Security via the [vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el). Please do **not** create a public GitHub issue.
 
 ---
 

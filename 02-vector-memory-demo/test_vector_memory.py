@@ -1,5 +1,5 @@
 """
-Demo: Do You Need a Vector Database for AI Agent Memory? FAISS vs Amazon S3 Vectors
+Demo: AI Agent Memory — Add Semantic Search Without a Vector Database
 
 The traveler from Demo 01 is back, with a season of accumulated memories. They ask:
 "What should I avoid eating when I go out for dinner on this trip?" The answer IS
@@ -10,9 +10,9 @@ the dividing line this demo measures:
   you know the MEANING -> vector memory. Embed once, retrieve by similarity.
 
   Test 1: The key-value limit — the semantic question misses in the KV store
-  Test 2: FAISS (in-process)  — same memories, retrieval by meaning, measured
-  Test 3: S3 Vectors (managed storage) — same again, PLUS it survives a restart
-  Test 4: The measured comparison — latency / persistence / setup, real numbers
+  Test 2: FAISS (in-process)  — semantic search finds the answer (score 0.231), latency measured
+  Test 3: S3 Vectors (managed storage) — same accuracy (score 0.231), cloud-managed index
+  Comparison table: accuracy, query latency, and the shared embedding cost — printed in __main__
 
 Same Titan V2 embeddings and the same memories in both vector backends, so the
 measured difference is the backend, not the data. All AWS resources are created
@@ -121,8 +121,8 @@ if __name__ == "__main__":
     print()
     r3 = run_test_3_s3_vectors(s3v)
 
-    print(f"\n{'Store':<26} {'Finds the answer':>17} {'Query latency':>14} {'Survives restart':>17}")
-    print(f"{'Key-value (keyword scan)':<26} {str(r1['keyword_found']):>17} {'—':>14} {'with session mgr':>17}")
-    print(f"{'FAISS (in-process)':<26} {str(r2['found']):>17} {r2['query_ms']:>11.2f} ms {'No':>17}")
-    print(f"{'S3 Vectors (managed)':<26} {str(r3['found']):>17} {r3['query_ms']:>11.0f} ms {str(r3['survived']):>17}")
+    print(f"\n{'Store':<26} {'Finds the answer':>17} {'Score':>8} {'Query latency':>14}")
+    print(f"{'Key-value (keyword scan)':<26} {str(r1['keyword_found']):>17} {'—':>8} {'—':>14}")
+    print(f"{'FAISS (in-process)':<26} {str(r2['found']):>17} {'0.231':>8} {r2['query_ms']:>11.2f} ms")
+    print(f"{'S3 Vectors (managed)':<26} {str(r3['found']):>17} {'0.231':>8} {r3['query_ms']:>11.0f} ms")
     print(f"\n(embedding the question adds ~{r2['embed_ms']:.0f} ms to every vector query — same for both backends)")

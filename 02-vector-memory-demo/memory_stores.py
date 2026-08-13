@@ -4,8 +4,8 @@ The dividing line between Demo 01 and this demo:
 
   - You KNOW the key ("what's my preferred cabin?")  -> key-value memory (Demo 01).
   - You only know the MEANING ("what should I avoid eating on this trip?") ->
-    vector memory: embed the memories once, embed the question, retrieve by
-    similarity. The stored text never needs to share words with the question.
+    semantic search: embed once at write time, embed the question at query time,
+    retrieve by cosine similarity. The stored text never needs to share words with the question.
 
 Two vector backends, same embeddings, same memories — so the measured difference
 is the backend, not the data:

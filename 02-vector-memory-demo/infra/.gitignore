@@ -1,7 +1,0 @@
-.venv/
-cdk.out/
-cdk-outputs.json
-layers/boto3-layer/python/
-*.egg-info/
-__pycache__/
-*.pyc

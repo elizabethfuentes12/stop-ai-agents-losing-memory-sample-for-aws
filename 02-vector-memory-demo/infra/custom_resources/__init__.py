@@ -1,1 +1,0 @@
-from custom_resources.custom_resources import VectorStoreResources

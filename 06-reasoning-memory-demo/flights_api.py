@@ -22,7 +22,7 @@ https://github.com/ricardoceci/curso-strands-agentcore-2026
 
 import json
 import os
-import time
+import threading
 
 import requests
 
@@ -121,8 +121,7 @@ def search_offers(origin: str, destination: str, departure_date: str,
                 headers=_duffel_headers(), params={"return_offers": "true"},
                 json=payload, timeout=_TIMEOUT,
             )
-            if resp.status_code >= 400:
-                break
+            resp.raise_for_status()
             offers = resp.json().get("data", {}).get("offers", [])
             simplified = [_simplify_offer(o) for o in offers]
             simplified = [o for o in simplified if o["price"] is not None]
@@ -131,9 +130,11 @@ def search_offers(origin: str, destination: str, departure_date: str,
             simplified.sort(key=lambda o: o["price"])
             if simplified:
                 return simplified[:max_results]
+        except requests.HTTPError:
+            break
         except requests.RequestException:
             if attempt < _RETRIES - 1:
-                time.sleep(2 * (attempt + 1))
+                threading.Event().wait(2 * (attempt + 1))
     return _fallback_offers(origin, destination, cabin_class, max_results)
 
 
@@ -150,19 +151,20 @@ def get_offer(offer_id: str) -> dict | None:
                 f"{DUFFEL_API_BASE_URL}/air/offers/{offer_id}",
                 headers=_duffel_headers(), timeout=_TIMEOUT,
             )
-            if resp.status_code >= 400:
-                break
+            resp.raise_for_status()
             data = resp.json().get("data")
             if data:
                 simplified = _simplify_offer(data)
                 # Duffel GET returns cabin per-passenger; keep the simple default.
                 return simplified
+        except requests.HTTPError:
+            break
         except requests.RequestException:
             if attempt < _RETRIES - 1:
-                time.sleep(2 * (attempt + 1))
+                threading.Event().wait(2 * (attempt + 1))
     # Fallback: the id may come from captured offers (offline mode).
     try:
-        with open(_FALLBACK_FILE) as f:
+        with open(_FALLBACK_FILE, encoding="utf-8") as f:
             captured = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
@@ -179,7 +181,7 @@ def _fallback_offers(origin: str, destination: str, cabin_class: str, max_result
     """Captured-once offers, used only when the sandbox is unreachable."""
     route = f"{origin.upper()}-{destination.upper()}"
     try:
-        with open(_FALLBACK_FILE) as f:
+        with open(_FALLBACK_FILE, encoding="utf-8") as f:
             captured = json.load(f)
     except (OSError, json.JSONDecodeError):
         captured = {}
@@ -206,6 +208,6 @@ def capture_fallback(routes: list[tuple[str, str, str]]) -> dict:
     for origin, dest, dep_date in routes:
         offers = search_offers(origin, dest, dep_date)
         captured[f"{origin.upper()}-{dest.upper()}"] = offers
-    with open(_FALLBACK_FILE, "w") as f:
+    with open(_FALLBACK_FILE, "w", encoding="utf-8") as f:
         json.dump(captured, f, indent=1)
     return {k: len(v) for k, v in captured.items() if not k.startswith("_")}

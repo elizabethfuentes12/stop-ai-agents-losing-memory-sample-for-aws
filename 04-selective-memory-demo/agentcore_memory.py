@@ -27,6 +27,7 @@ four strategies if it doesn't exist. Real API facts verified live 2026-07-16:
 """
 
 import os
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -90,7 +91,7 @@ def ensure_memory() -> dict:
         detail = ctrl.get_memory(memoryId=memory["id"])["memory"]
         if detail["status"] == "ACTIVE":
             break
-        time.sleep(10)
+        threading.Event().wait(10)
     else:
         raise TimeoutError(f"memory {memory['id']} not ACTIVE after 10 min")
 
@@ -130,5 +131,5 @@ def wait_for_extraction(memory_id: str, strategy_id: str, actor_id: str, query: 
     while time.time() - start < timeout_s:
         if len(retrieve(memory_id, strategy_id, actor_id, query)) >= expect_min:
             return time.time() - start
-        time.sleep(10)
+        threading.Event().wait(10)
     return None

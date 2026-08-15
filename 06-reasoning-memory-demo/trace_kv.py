@@ -272,7 +272,7 @@ def check_fare_alert(route: str) -> str:
     # captured real offers (fallback_offers.json), not invented at runtime.
     import flights_api, json as _json
     try:
-        with open(flights_api._FALLBACK_FILE) as f:
+        with open(flights_api._FALLBACK_FILE, encoding="utf-8") as f:
             captured = _json.load(f)
     except OSError:
         captured = {}

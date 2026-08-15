@@ -10,10 +10,12 @@ ResourceType field in Properties selects which resource to manage:
   "AgentCoreMemory" — create/delete an AgentCore Memory with 4 built-in strategies
 """
 import json
+import threading
 import time
 import os
 import boto3
 import urllib.request
+from urllib.parse import urlparse
 
 REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
@@ -28,8 +30,11 @@ def send_response(event, context, status, reason, physical_id, data=None):
         "LogicalResourceId": event["LogicalResourceId"],
         "Data": data or {},
     }).encode()
+    response_url = event["ResponseURL"]
+    if urlparse(response_url).scheme not in ("https", "http"):
+        raise ValueError(f"Unexpected scheme in ResponseURL: {response_url!r}")
     req = urllib.request.Request(
-        url=event["ResponseURL"],
+        url=response_url,
         data=body,
         method="PUT",
         headers={"Content-Type": "", "Content-Length": len(body)},
@@ -174,5 +179,5 @@ def _wait_memory_active(ctrl, memory_id, timeout=540):
         detail = ctrl.get_memory(memoryId=memory_id)["memory"]
         if detail["status"] == "ACTIVE":
             return memory_id
-        time.sleep(15)
+        threading.Event().wait(15)
     raise TimeoutError(f"AgentCore Memory {memory_id} not ACTIVE after {timeout}s")

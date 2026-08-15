@@ -10,10 +10,12 @@ ResourceType field in Properties selects which resource to manage:
   "DynamoDBVectorTable" — create/delete a DynamoDB table with a vector index
 """
 import json
+import threading
 import time
 import os
 import boto3
 import urllib.request
+from urllib.parse import urlparse
 
 REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
@@ -28,8 +30,11 @@ def send_response(event, context, status, reason, physical_id, data=None):
         "LogicalResourceId": event["LogicalResourceId"],
         "Data": data or {},
     }).encode()
+    response_url = event["ResponseURL"]
+    if urlparse(response_url).scheme not in ("https", "http"):
+        raise ValueError(f"Unexpected scheme in ResponseURL: {response_url!r}")
     req = urllib.request.Request(
-        url=event["ResponseURL"],
+        url=response_url,
         data=body,
         method="PUT",
         headers={"Content-Type": "", "Content-Length": len(body)},
@@ -172,7 +177,7 @@ def _wait_table_active(client, table, timeout=120):
         status = client.describe_table(TableName=table)["Table"]["TableStatus"]
         if status == "ACTIVE":
             return
-        time.sleep(2)
+        threading.Event().wait(2)
     raise TimeoutError(f"Table {table!r} not ACTIVE after {timeout}s")
 
 
@@ -185,7 +190,7 @@ def _wait_index_active(client, table, index, timeout=120):
                 if vi["IndexStatus"] == "ACTIVE" and not vi.get("Backfilling", False):
                     return
                 break
-        time.sleep(2)
+        threading.Event().wait(2)
     raise TimeoutError(f"Vector index {index!r} not ACTIVE after {timeout}s")
 
 
@@ -194,7 +199,7 @@ def _wait_table_gone(client, table, timeout=60):
     while time.time() < deadline:
         try:
             client.describe_table(TableName=table)
-            time.sleep(3)
+            threading.Event().wait(3)
         except client.exceptions.ResourceNotFoundException:
             return
     raise TimeoutError(f"Table {table!r} not deleted after {timeout}s")

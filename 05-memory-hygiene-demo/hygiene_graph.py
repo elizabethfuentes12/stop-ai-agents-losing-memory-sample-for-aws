@@ -25,6 +25,7 @@ Poisoning is a documented threat — see the citations in hygiene_kv.py
 
 import os
 import re
+import threading
 import time
 
 from dotenv import load_dotenv
@@ -158,7 +159,7 @@ def _wait_for_database_online(driver, db: str, timeout_s: float = 30.0) -> None:
             ).single()
         if row and row["currentStatus"] == "online":
             return
-        time.sleep(0.5)
+        threading.Event().wait(0.5)
 
 
 def _wait_for_index_online(driver, db: str, name: str, timeout_s: float = 20.0) -> None:
@@ -170,7 +171,7 @@ def _wait_for_index_online(driver, db: str, name: str, timeout_s: float = 20.0) 
             ).single()
         if row and row["state"] == "ONLINE":
             return
-        time.sleep(0.5)
+        threading.Event().wait(0.5)
 
 
 def reset_graph(driver, db: str) -> None:

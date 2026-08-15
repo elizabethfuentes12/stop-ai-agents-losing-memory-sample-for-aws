@@ -17,7 +17,7 @@ Free tier is for non-commercial use (this public demo qualifies) and requires
 attribution: weather data by Open-Meteo (CC-BY 4.0), geocoding by GeoNames.
 """
 
-import time
+import threading
 from datetime import date
 
 import requests
@@ -35,12 +35,13 @@ def _get_json(url: str, params: dict) -> dict | None:
     for attempt in range(_RETRIES):
         try:
             resp = requests.get(url, params=params, timeout=_TIMEOUT)
-            if resp.status_code >= 400:
-                return None
+            resp.raise_for_status()
             return resp.json()
+        except requests.HTTPError:
+            return None
         except requests.RequestException:
             if attempt < _RETRIES - 1:
-                time.sleep(2 * (attempt + 1))
+                threading.Event().wait(2 * (attempt + 1))
     return None
 
 

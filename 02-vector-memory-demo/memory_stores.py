@@ -32,6 +32,7 @@ Requires boto3 >= 1.43.72 (SearchVectors was added in that release).
 
 import json
 import os
+import threading
 import time
 
 import boto3
@@ -247,7 +248,7 @@ class DynamoDBVectorStore:
             if status == "ACTIVE":
                 self._wait_index_active()
                 return
-            time.sleep(1.0)
+            threading.Event().wait(1.0)
         raise TimeoutError(f"DynamoDB table {self.table!r} not ACTIVE after {timeout_s:.0f}s")
 
     def _wait_index_active(self, timeout_s: float = 60.0) -> None:
@@ -259,7 +260,7 @@ class DynamoDBVectorStore:
                     if vi["IndexStatus"] == "ACTIVE" and not vi.get("Backfilling", False):
                         return
                     break
-            time.sleep(1.0)
+            threading.Event().wait(1.0)
         raise TimeoutError(f"Vector index {self.index!r} not ACTIVE after {timeout_s:.0f}s")
 
     def put(self, key: str, text: str, vector: list[float]) -> None:

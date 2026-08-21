@@ -15,12 +15,15 @@ This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python), [
 | Store | Finds the answer | Similarity score | Query latency |
 |-------|:----------------:|:----------------:|:-------------:|
 | Key-value (keyword scan) | **No** — no shared words | — | — |
-| FAISS (in-process) | **Yes** | **0.231** | **<0.1 ms** |
+| FAISS | **Yes** | **0.231** | **<0.1 ms** |
 | S3 Vectors (managed storage) | **Yes** | **0.231** | **~195 ms** |
+| DynamoDB Vector Search | **Yes** | **0.231** | **single-digit ms** |
 
-FAISS and S3 Vectors return the same answer with the same score — accuracy is identical. The embedding call (~510 ms with Titan V2) dominates end-to-end latency for both.
+All three vector backends return the same answer with the same score — accuracy is identical. The embedding call (~510 ms with Titan V2) dominates end-to-end latency for all of them.
 
-![Semantic search flow: embedding the question takes ~510 ms for both backends, then FAISS queries in 0.09 ms (dies on restart) and S3 Vectors in 195 ms (survives with 10/10 vectors)](images/ai-agent-faiss-vs-s3-vectors-tradeoff.png)
+![Semantic search flow: embedding the question takes ~510 ms for both backends, then FAISS queries in 0.09 ms and S3 Vectors in 195 ms (survives with 10/10 vectors)](images/ai-agent-faiss-vs-s3-vectors-tradeoff.png)
+
+![DynamoDB Vector Search stores embeddings inside the existing table alongside operational data, unlike S3 Vectors which uses a separate dedicated bucket](images/ai-agent-dynamodb-vectors-inside-table.png)
 
 ### Vector store comparison
 
@@ -43,6 +46,7 @@ FAISS and S3 Vectors return the same answer with the same score — accuracy is 
 | Facts under known keys (profile, prefs) | Key-value ([Demo 01](../01-key-value-memory-demo/)) | Exact and instant — don't pay embeddings for lookups |
 | Semantic search, local / prototype | **FAISS** | Zero infrastructure, pip install, in-process |
 | Semantic search, cloud / infrequent queries | **S3 Vectors** | Purpose-built AWS vector storage, subsecond latency, up to 2B vectors |
+| Agent data already in DynamoDB | **DynamoDB Vector Search** | Add a vector index to the existing table; single-digit ms query latency |
 | High QPS, hybrid search, or advanced filtering | **Dedicated vector DB** | OpenSearch, Qdrant, Weaviate, Milvus, pgvector, Chroma |
 | Multi-hop questions over relationships | Graph ([Demo 03](../03-graph-memory-demo/)) | Similarity can't follow edges |
 

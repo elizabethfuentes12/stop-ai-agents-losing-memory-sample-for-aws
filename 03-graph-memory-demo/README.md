@@ -46,6 +46,8 @@ The answer — **Maya Torres** — is never stated directly. You can only reach 
 
 Both strategies receive the **same facts** and share the **same vector index**. The graph wins because it stores memories as *connected nodes*, not because it's handed the answer. The advantage is structural.
 
+![Multi-hop question over agent memory: vector similarity surfaces Iberia, Madrid and Spain as disconnected pieces; graph traversal walks the edges back to Maya Torres](images/ai-agent-multihop-vector-vs-graph.png)
+
 ---
 
 ## Scenarios Demonstrated

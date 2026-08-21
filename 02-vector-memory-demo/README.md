@@ -57,7 +57,8 @@ FAISS and S3 Vectors return the same answer with the same score — accuracy is 
 | **1. The key-value limit** | Keyword scan misses the semantic question; dump-all pays for the whole memory per question |
 | **2. FAISS** | Same memories retrieved by meaning; query latency measured after warm-up |
 | **3. S3 Vectors** | Same again — plus a fresh client (the "restart") still sees every vector |
-| **4. A real agent** | Both recall tools attached; the agent picks key-lookup vs semantic per question from the tool docstrings alone |
+| **4. DynamoDB Vector Search** | Same accuracy, single-digit ms latency — vector index lives inside a DynamoDB table alongside your operational data |
+| **Notebook** | Both recall tools attached to one agent; it picks key-lookup vs semantic per question from the tool docstrings alone |
 
 ---
 
@@ -94,9 +95,9 @@ uv run python test_vector_memory.py
 
 | File | Purpose |
 |------|---------|
-| `test_vector_memory.py` | Main demo — 3 measured tests + comparison table (no LLM needed) |
+| `test_vector_memory.py` | Main demo — 4 measured tests + comparison table (no LLM needed) |
 | `test_vector_memory.ipynb` | Interactive walkthrough + a real agent choosing between the tools |
-| `memory_stores.py` | The three stores + Titan embedder + self-provisioning (`ensure` pattern) |
+| `memory_stores.py` | The four stores + Titan embedder + self-provisioning (`ensure` pattern) |
 | `tools.py` | Strands tools: `remember_note`, `recall_by_key`, `recall_semantic` |
 | `requirements.txt` | Dependencies |
 
@@ -165,7 +166,7 @@ For SaaS memory on S3 Vectors with per-tenant isolation (one index per tenant, I
 | FAISS import error | `uv pip install faiss-cpu` (the wheel ships prebuilt) |
 | Slow first query | First call pays connection/setup cost — the demo warms up before measuring |
 
-**Tested versions:** Strands 1.46.0, faiss-cpu 1.14.3, boto3 1.43.x, Titan Text Embeddings V2 (1024 dims).
+**Tested versions:** Strands 1.46.0, faiss-cpu 1.14.3, boto3 1.43.72+, Titan Text Embeddings V2 (1024 dims).
 
 ---
 

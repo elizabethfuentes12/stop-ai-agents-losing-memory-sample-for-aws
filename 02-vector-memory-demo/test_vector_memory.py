@@ -173,5 +173,5 @@ if __name__ == "__main__":
     print(f"{'FAISS (in-process)':<30} {str(r2['found']):>13} {r2['score']:>8.3f} {r2['query_ms']:>11.2f} ms")
     print(f"{'S3 Vectors (managed)':<30} {str(r3['found']):>13} {r3['score']:>8.3f} {r3['query_ms']:>11.0f} ms")
     print(f"{'DynamoDB Vector Search':<30} {str(r4['found']):>13} {r4['score']:>8.3f} {r4['query_ms']:>11.0f} ms")
-    print(f"\n(embedding adds ~{r2['embed_ms']:.0f} ms to every vector query — the same for all three backends)")
-    print("(cos_sim = cosine similarity, higher is more similar; all three backends use the same Titan V2 embeddings)")
+    print(f"\n(embedding adds ~{r2['embed_ms']:.0f} ms to every vector query — the same for all four backends)")
+    print("(cos_sim = cosine similarity, higher is more similar; all four backends use the same Titan V2 embeddings)")

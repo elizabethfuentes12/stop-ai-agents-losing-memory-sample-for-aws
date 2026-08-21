@@ -6,6 +6,8 @@
 
 This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python), [Amazon S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el), and [Amazon Bedrock AgentCore Memory](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/built-in-strategies.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el). The patterns are framework-agnostic and carry over to other agent frameworks.
 
+![Selective memory architecture: 3 mechanisms — A inline agent tools (4/5, immediate), B own extractor to S3 Vectors (5/5, 4s), C AgentCore managed (5/5, 53-85s)](images/ai-agent-selective-memory-architecture.png)
+
 ---
 
 ## The three mechanisms
@@ -40,6 +42,8 @@ Planted ground truth: **5 keepers** (2 facts, 2 preferences, 1 episode) and **3 
 | C — AgentCore managed | 5/5* | 0-2* | ~0.4 s/turn (`create_event` only) | **~53-85 s** (measured across runs) | managed pricing |
 
 \* C's extraction is nondeterministic — across runs it kept 4-5/5 and leaked 0-2 decoys. The built-in criteria aren't yours to tune; that's part of the trade-off.
+
+![3 ways to select what an AI agent remembers: selection quality and availability lag per mechanism](images/selective-memory-mechanisms.png)
 
 **What the numbers teach:**
 - **A** is free but couples selection to conversation latency, and filing quality rides on the chat model's attention.
@@ -98,7 +102,8 @@ uv run python test_selective_memory.py
 | `tools.py` | Mechanism A: the four generic memory tools (+ flight tools for reuse) |
 | `extractor.py` | Mechanism B: 4 extraction prompts + typed S3 Vectors store |
 | `agentcore_memory.py` | Mechanism C: ensure_memory + create_event + retrieve + lag measurement |
-| `memory_stores.py` | Shared S3 Vectors store + Titan embedder (from Demo 02) |
+| `memory_stores.py` | S3 Vectors store + Titan embedder (self-provisioning, used by the extractor) |
+| `images/generate_chart.py` | Generates the selection-quality and availability-lag chart |
 | `requirements.txt` | Dependencies |
 
 ---
@@ -149,7 +154,7 @@ Each prompt runs against each raw turn, off the conversation path. `NOTHING` is 
 | Wrong AWS account picked up | `AWS_BEARER_TOKEN*` env vars override profiles; the demo drops them |
 | B keeps a decoy / misses a keeper | The prompts are the policy — tune them; that's the point of owning the extractor |
 
-**Tested versions:** Strands 1.46.0, boto3 1.43.x, Titan Text Embeddings V2, AgentCore Memory API (July 2026).
+**Tested versions:** Strands 1.46.0, boto3 1.43.44+, Titan Text Embeddings V2, AgentCore Memory API (July 2026).
 
 ---
 

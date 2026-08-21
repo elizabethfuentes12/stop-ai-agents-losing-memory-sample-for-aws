@@ -1,28 +1,11 @@
-"""The three memory stores this demo compares — key-value, FAISS, Amazon S3 Vectors.
+"""Amazon S3 Vectors store and Titan embedder used by this demo.
 
-The dividing line between Demo 01 and this demo:
+Demo 04 is about selection — deciding *what* to remember, not which backend to use.
+The vector backend is Amazon S3 Vectors: the extractor writes memories there after
+selecting what's worth keeping, and the agent reads them back by semantic similarity.
 
-  - You KNOW the key ("what's my preferred cabin?")  -> key-value memory (Demo 01).
-  - You only know the MEANING ("what should I avoid eating on this trip?") ->
-    vector memory: embed the memories once, embed the question, retrieve by
-    similarity. The stored text never needs to share words with the question.
-
-Two vector backends, same embeddings, same memories — so the measured difference
-is the backend, not the data:
-
-  - FAISS (in-process): the index lives in RAM. Microsecond queries, zero
-    infrastructure — and it dies with the Python process.
-  - Amazon S3 Vectors (managed storage): the index lives in a vector bucket.
-    You create the bucket + index (this module self-provisions both if missing),
-    write with put_vectors, query with query_vectors. It survives restarts and
-    is reachable from any process with credentials.
-
-Embeddings: Amazon Titan Text Embeddings V2 via Bedrock (1024 dims), the same
-embedder for both backends. boto3 clients are built from an explicit profile
-(AWS_PROFILE or default chain) so stray env tokens can't hijack the session.
-
-Self-provisioning (series rule): every AWS resource the demo needs is created
-by the demo itself if it doesn't exist — no console steps.
+Self-provisioning (series rule): the bucket and index are created if missing — no
+console steps needed to run the demo.
 """
 
 import json
@@ -30,8 +13,6 @@ import os
 import time
 
 import boto3
-import faiss
-import numpy as np
 
 EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
 EMBED_DIM = 1024
@@ -54,7 +35,7 @@ def _aws():
 
 
 def embed(text: str) -> list[float]:
-    """Real Titan V2 embedding (1024 dims) — used by BOTH vector backends."""
+    """Real Titan V2 embedding (1024 dims)."""
     client = _aws().client("bedrock-runtime", region_name=AWS_REGION)
     resp = client.invoke_model(
         modelId=EMBED_MODEL_ID,
@@ -63,51 +44,7 @@ def embed(text: str) -> list[float]:
     return json.loads(resp["body"].read())["embedding"]
 
 
-# ── Store 1: key-value (Demo 01's memory — the baseline) ─────────────────────
-class KeyValueStore:
-    """Plain dict store: perfect when you know the key, blind to meaning."""
-
-    def __init__(self):
-        self.data: dict[str, str] = {}
-
-    def put(self, key: str, text: str) -> None:
-        self.data[key] = text
-
-    def get(self, key: str) -> str | None:
-        return self.data.get(key)
-
-    def keyword_search(self, query: str) -> list[str]:
-        """The best a key-value store can do without a key: substring matching."""
-        words = {w.lower().strip("?.,!") for w in query.split() if len(w) > 3}
-        return [text for text in self.data.values()
-                if any(w in text.lower() for w in words)]
-
-    def dump_all(self) -> str:
-        return "\n".join(self.data.values())
-
-
-# ── Store 2: FAISS (in-process vector index) ─────────────────────────────────
-class FaissStore:
-    """Vector memory in RAM: cosine similarity via a normalized inner-product index."""
-
-    def __init__(self):
-        self.index = faiss.IndexFlatIP(EMBED_DIM)
-        self.texts: list[str] = []
-
-    def put(self, text: str, vector: list[float]) -> None:
-        v = np.array([vector], dtype="float32")
-        faiss.normalize_L2(v)
-        self.index.add(v)
-        self.texts.append(text)
-
-    def query(self, vector: list[float], top_k: int = 3) -> list[tuple[str, float]]:
-        v = np.array([vector], dtype="float32")
-        faiss.normalize_L2(v)
-        scores, ids = self.index.search(v, top_k)
-        return [(self.texts[i], float(s)) for i, s in zip(ids[0], scores[0]) if i >= 0]
-
-
-# ── Store 3: Amazon S3 Vectors (managed vector storage) ─────────────────────
+# ── Amazon S3 Vectors (managed vector storage) ───────────────────────────────
 class S3VectorStore:
     """Vector memory in a vector bucket: persists across restarts, shared across processes."""
 

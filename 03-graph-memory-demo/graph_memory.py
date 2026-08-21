@@ -105,11 +105,11 @@ NODE_TEXT = {
 # Allow-lists: relation types and node-type labels are interpolated into Cypher
 # (Cypher cannot parameterize a relationship type or a label), so we validate them
 # against these fixed sets to keep the interpolation safe.
-ALLOWED_RELATIONS = {"WORKS_AT", "MEMBER_OF", "FLIES_TO", "IN_COUNTRY"}
+ALLOWED_RELATIONS = {
+    "WORKS_AT", "MEMBER_OF", "FLIES_TO", "IN_COUNTRY",  # structural (seeded graph)
+    "BOOKED_WITH", "PREFERS_CABIN", "TRAVELED_TO",       # learned from bookings
+}
 ALLOWED_TYPES = {"Person", "Airline", "Alliance", "Location", "Country"}
-
-# The multi-hop question the whole demo is built around.
-MULTIHOP_QUESTION = "Who do I know that's connected to flights to Spain?"
 
 # The traversal that makes the "after" case work: the vector index hands us an
 # entry node (via `node` + `score`); we then find a Person and the shortest path
@@ -296,11 +296,11 @@ def _wait_for_index_online(driver, db: str, name: str, timeout_s: float = 20.0) 
         threading.Event().wait(0.5)
 
 
-def make_before_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> VectorRetriever:
-    """The 'before' retriever: pure vector similarity, no traversal.
+def make_semantic_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> VectorRetriever:
+    """Pure vector similarity retriever — returns the most similar nodes, no traversal.
 
-    Returns the individually most-similar memory nodes. On a multi-hop question it
-    surfaces related concepts as separate pieces but cannot connect them to a person.
+    On a multi-hop question it surfaces related concepts as separate pieces but cannot
+    connect them to a person, because similarity has no notion of a relationship.
     """
     return VectorRetriever(
         driver,
@@ -311,11 +311,11 @@ def make_before_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> Vector
     )
 
 
-def make_after_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> VectorCypherRetriever:
-    """The 'after' retriever: vector similarity to find an entry node, then graph traversal.
+def make_graph_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> VectorCypherRetriever:
+    """Vector similarity + Cypher graph traversal retriever.
 
-    Uses RETRIEVAL_QUERY to walk from a Person to the vector-matched entry node and
-    return the person plus the full relationship chain — the multi-hop answer.
+    Finds an entry node by similarity, then walks the relationships back to a Person
+    and returns the full chain — the multi-hop answer.
     """
     return VectorCypherRetriever(
         driver,

@@ -51,8 +51,8 @@ MODEL = OpenAIModel(model_id="gpt-4o-mini")  # api_key read from the OPENAI_API_
 # from strands.models import BedrockModel
 # MODEL = BedrockModel(model_id="openai.gpt-oss-120b-1:0", region_name="us-west-2")
 
-# The headline multi-hop question the demo is built around.
-QUESTION = gm.MULTIHOP_QUESTION
+# The multi-hop question the demo is built around.
+QUESTION = "Who do I know that's connected to flights to Spain?"
 
 # Deterministic scorecard: multi-hop questions whose correct answer is the PERSON,
 # reachable only by following relationships. Same known graph → reproducible scores.
@@ -65,45 +65,59 @@ SCORECARD = [
 
 
 def run_test_1_semantic(driver, db, embedder):
-    """Test 1: Semantic recall only (the 'before'). Pure vector similarity, no traversal."""
+    """Test 1: Agent with semantic-only recall. Vector similarity alone cannot answer
+    a multi-hop question — it surfaces related pieces but never connects them to a person."""
     print("\n" + "=" * 70)
-    print("TEST 1: SEMANTIC RECALL (before) — pure vector similarity")
+    print("TEST 1: AGENT WITH SEMANTIC RECALL — vector similarity only, no traversal")
     print("=" * 70)
 
-    retriever = gm.make_before_retriever(driver, db, embedder)
-    result = retriever.search(query_text=QUESTION, top_k=3)
+    tt.init_memory(driver=driver, db=db, embedder=embedder)
+
+    agent = Agent(
+        model=MODEL,
+        system_prompt="You are a personal travel assistant with access to the user's travel memory. Be concise.",
+        tools=[tt.recall_semantic],
+        callback_handler=None,
+    )
 
     print(f"\nQuestion: {QUESTION}\n")
-    print("Top-3 most similar memory nodes:")
-    for item in result.items:
-        print(f"  - {item.content}")
+    resp = agent(QUESTION)
+    answer = resp.message["content"][0]["text"]
+    print(f"  Agent: {answer.strip()[:220]}")
 
-    recovered = any("Maya Torres" in item.content for item in result.items)
+    recovered = "Maya Torres" in answer
     print(f"\n  Recovers the person (Maya Torres)? {recovered}")
-    print("  It surfaces Iberia / Madrid / Spain as separate pieces but cannot connect")
-    print("  them to a person — similarity has no notion of a relationship.")
-    return {"strategy": "semantic (before)", "recovered": recovered}
+    print("  Similarity surfaces Iberia / Madrid / Spain as separate pieces but cannot")
+    print("  connect them to a person — no notion of a relationship.")
+    return {"strategy": "semantic recall", "recovered": recovered}
 
 
 def run_test_2_graph(driver, db, embedder):
-    """Test 2: Graph recall (the 'after'). Vector similarity to an entry node, then traversal."""
+    """Test 2: Agent with graph recall. Similarity finds an entry node, then Cypher
+    traversal walks the relationships back to the person."""
     print("\n" + "=" * 70)
-    print("TEST 2: GRAPH RECALL (after) — vector similarity + graph traversal")
+    print("TEST 2: AGENT WITH GRAPH RECALL — vector similarity + graph traversal")
     print("=" * 70)
 
-    retriever = gm.make_after_retriever(driver, db, embedder)
-    result = retriever.search(query_text=QUESTION, top_k=3)
+    tt.init_memory(driver=driver, db=db, embedder=embedder)
+
+    agent = Agent(
+        model=MODEL,
+        system_prompt="You are a personal travel assistant with access to the user's travel memory. Be concise.",
+        tools=[tt.recall_graph],
+        callback_handler=None,
+    )
 
     print(f"\nQuestion: {QUESTION}\n")
-    print("Traversal results (person + the relationship chain):")
-    for item in result.items:
-        print(f"  - {item.content}")
+    resp = agent(QUESTION)
+    answer = resp.message["content"][0]["text"]
+    print(f"  Agent: {answer.strip()[:220]}")
 
-    recovered = any("Maya Torres" in item.content for item in result.items)
+    recovered = "Maya Torres" in answer
     print(f"\n  Recovers the person (Maya Torres)? {recovered}")
-    print("  Vector search finds an entry node, then Cypher walks the edges back to the")
-    print("  person: Maya Torres -> Iberia -> Madrid -> Spain.")
-    return {"strategy": "graph (after)", "recovered": recovered}
+    print("  Graph traversal walks Maya Torres -> Iberia -> Madrid -> Spain and returns")
+    print("  the person — the answer similarity alone could not reach.")
+    return {"strategy": "graph recall", "recovered": recovered}
 
 
 def run_test_3_agent(driver, db, embedder):
@@ -116,12 +130,9 @@ def run_test_3_agent(driver, db, embedder):
 
     agent = Agent(
         model=MODEL,
-        system_prompt=(
-            "You are a travel assistant with graph memory. Use recall_graph to answer "
-            "questions about people and places the user has mentioned, and remember_fact "
-            "to store new durable facts the user tells you. Be concise."
-        ),
-        tools=[tt.recall_graph, tt.recall_semantic, tt.remember_fact],
+        system_prompt="You are a personal travel assistant with access to the user's travel memory. Always store new facts the user shares. Be concise.",
+        tools=[tt.search_flights, tt.book_flight, tt.best_time_to_visit,
+               tt.recall_graph, tt.recall_semantic, tt.remember_fact],
         callback_handler=None,
     )
 
@@ -147,27 +158,28 @@ def run_test_3_agent(driver, db, embedder):
 
 
 def run_test_4_scorecard(driver, db, embedder):
-    """Test 4: Deterministic scorecard over several multi-hop questions (feeds the chart)."""
+    """Test 4: Deterministic scorecard — semantic vs graph on 4 multi-hop questions.
+    Uses retrievers directly (not agents) so scoring is deterministic and feeds the chart."""
     print("\n" + "=" * 70)
-    print("TEST 4: DETERMINISTIC SCORECARD — before vs after on multi-hop questions")
+    print("TEST 4: SCORECARD — semantic retrieval vs graph traversal, 4 multi-hop questions")
     print("=" * 70)
 
-    before = gm.make_before_retriever(driver, db, embedder)
-    after = gm.make_after_retriever(driver, db, embedder)
+    semantic_retriever = gm.make_semantic_retriever(driver, db, embedder)
+    graph_retriever = gm.make_graph_retriever(driver, db, embedder)
 
-    before_hits = after_hits = 0
-    print(f"\n  {'Question':<52} {'before':>7} {'after':>7}")
-    print("  " + "-" * 68)
+    semantic_hits = graph_hits = 0
+    print(f"\n  {'Question':<52} {'semantic':>9} {'graph':>7}")
+    print("  " + "-" * 70)
     for question, target in SCORECARD:
-        b = any(target in it.content for it in before.search(query_text=question, top_k=3).items)
-        a = any(target in it.content for it in after.search(query_text=question, top_k=3).items)
-        before_hits += b
-        after_hits += a
-        print(f"  {question[:52]:<52} {'✓' if b else '✗':>7} {'✓' if a else '✗':>7}")
+        s = any(target in it.content for it in semantic_retriever.search(query_text=question, top_k=3).items)
+        g = any(target in it.content for it in graph_retriever.search(query_text=question, top_k=3).items)
+        semantic_hits += s
+        graph_hits += g
+        print(f"  {question[:52]:<52} {'✓' if s else '✗':>9} {'✓' if g else '✗':>7}")
 
     total = len(SCORECARD)
-    print(f"\n  Correct answers recovered — before: {before_hits}/{total} | after: {after_hits}/{total}")
-    return {"total": total, "before_hits": before_hits, "after_hits": after_hits}
+    print(f"\n  Correct answers recovered — semantic: {semantic_hits}/{total} | graph: {graph_hits}/{total}")
+    return {"total": total, "before_hits": semantic_hits, "after_hits": graph_hits}
 
 
 if __name__ == "__main__":
@@ -188,12 +200,12 @@ if __name__ == "__main__":
         print("=" * 70)
         print(f"\n  {'Test':<42} {'Recovers multi-hop answer?':>26}")
         print("  " + "-" * 68)
-        print(f"  {'Test 1 — Semantic recall (before)':<42} {str(r1['recovered']):>26}")
-        print(f"  {'Test 2 — Graph recall (after)':<42} {str(r2['recovered']):>26}")
-        print(f"  {'Test 3 — Strands agent + graph memory':<42} {str(r3['recovered']):>26}")
+        print(f"  {'Test 1 — Agent: semantic recall only':<42} {str(r1['recovered']):>26}")
+        print(f"  {'Test 2 — Agent: graph traversal':<42} {str(r2['recovered']):>26}")
+        print(f"  {'Test 3 — Agent: graph memory + write':<42} {str(r3['recovered']):>26}")
         print(
-            f"\n  Scorecard (Test 4): before {r4['before_hits']}/{r4['total']} correct, "
-            f"after {r4['after_hits']}/{r4['total']} correct."
+            f"\n  Scorecard (Test 4): semantic {r4['before_hits']}/{r4['total']} correct, "
+            f"graph {r4['after_hits']}/{r4['total']} correct."
         )
         print("\n  Key insight: similarity finds related pieces; only traversal connects them.")
         print("  Graph memory answers multi-hop questions that flat/semantic memory cannot.")

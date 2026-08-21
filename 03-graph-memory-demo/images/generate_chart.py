@@ -21,8 +21,8 @@ BEFORE_HITS = 1   # semantic recall (pure vector similarity)
 AFTER_HITS = 4    # graph recall (vector similarity + traversal)
 
 strategies = [
-    "Semantic recall\n(before)\nvector similarity",
-    "Graph recall\n(after)\nsimilarity + traversal",
+    "Semantic recall\nvector similarity only",
+    "Graph recall\nsimilarity + traversal",
 ]
 values = [BEFORE_HITS, AFTER_HITS]
 colors = [RED, GREEN]
@@ -68,7 +68,7 @@ ax.annotate(
 
 ax.text(
     0.5, -0.16,
-    'Same seeded graph (Sarah Chen → Vista Hotels → boutique → Kyoto → Japan); '
+    "Same seeded graph (Maya Torres → Iberia → Madrid → Spain); "
     "answer checked against the known graph.",
     transform=ax.transAxes, ha="center", fontsize=9, color="#666666",
 )

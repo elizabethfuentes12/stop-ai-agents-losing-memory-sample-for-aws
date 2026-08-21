@@ -14,6 +14,8 @@ Related research (traceability/provenance theme):
 
 This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) for the graph track. The patterns are framework-agnostic and carry over to other agent frameworks.
 
+![Reasoning memory architecture: HookProvider records decision traces automatically; flat store answers 2/4 reverse audit, graph traversal answers 4/4](images/ai-agent-reasoning-memory-architecture.png)
+
 ---
 
 ## What This Demo Shows

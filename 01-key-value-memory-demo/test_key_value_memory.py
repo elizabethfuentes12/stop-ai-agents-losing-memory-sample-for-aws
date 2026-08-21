@@ -178,7 +178,7 @@ def run_test_3_persistence():
     import shutil
     if os.path.exists(storage_dir):
         shutil.rmtree(storage_dir)
-    return {"survived": survived}
+    return {"survived": survived, "learned": prefs_a is not None}
 
 
 def ensure_bucket(s3, bucket: str) -> None:
@@ -255,7 +255,7 @@ def run_test_4_s3_persistence():
     keys = [{"Key": o["Key"]} for o in listed.get("Contents", [])]
     if keys:
         s3.delete_objects(Bucket=bucket, Delete={"Objects": keys})
-    return {"survived": survived}
+    return {"survived": survived, "learned": prefs_a is not None}
 
 
 if __name__ == "__main__":
@@ -269,6 +269,6 @@ if __name__ == "__main__":
     print(f"\n{'Test':<42} {'Learned prefs':>14} {'Survived restart':>17}")
     print(f"{'1 — no memory tools (transcript only)':<42} {str(r1['prefs'] is not None):>14} {str(r1['survived']):>17}")
     print(f"{'2 — agent.state':<42} {str(bool(r2['prefs'])):>14} {'—':>17}")
-    print(f"{'3 — agent.state + FileSessionManager':<42} {'True':>14} {str(r3['survived']):>17}")
-    print(f"{'4 — agent.state + S3SessionManager':<42} {'True' if r4['survived'] else '—':>14} {str(r4['survived']):>17}")
+    print(f"{'3 — agent.state + FileSessionManager':<42} {str(r3['learned']):>14} {str(r3['survived']):>17}")
+    print(f"{'4 — agent.state + S3SessionManager':<42} {str(r4.get('learned', '—')):>14} {str(r4['survived']):>17}")
     print(f"\nwall time: {time.time() - start:.0f}s (live Duffel + Open-Meteo calls)")

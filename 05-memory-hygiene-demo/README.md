@@ -13,6 +13,8 @@ Based on research:
 
 This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) for the graph track. The patterns are framework-agnostic and carry over to other agent frameworks.
 
+![Memory hygiene architecture: write-gate screens injection/PII/low-trust content before it reaches key-value or graph store; forget removes what already got in](images/ai-agent-memory-hygiene-architecture.png)
+
 ---
 
 ## What This Demo Shows

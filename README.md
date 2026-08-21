@@ -16,7 +16,7 @@ These demos use Strands Agents for implementation. The memory patterns demonstra
 | Demo | Description | Stack |
 |------|-------------|-------|
 | [01 - Key-Value Memory](01-key-value-memory-demo/) | Stop your agent from forgetting user preferences: the same 3-turn conversation climbing the durability ladder — no memory → `agent.state` → local disk → Amazon S3. Real flight data (Duffel); the only variable is where memory lives. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-agent.state-blue) |
-| [02 - Vector Memory](02-vector-memory-demo/) | Do you need a vector database for agent memory? FAISS (in-process, <0.1 ms, dies with the process) vs Amazon S3 Vectors (managed, ~200 ms, survives restarts) — same Titan embeddings, measured. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![Strands](https://img.shields.io/badge/Strands-memory-blue) |
+| [02 - Vector Memory](02-vector-memory-demo/) | Do you need a vector database for agent memory? FAISS (in-process, <0.1 ms) vs Amazon S3 Vectors (managed, ~200 ms, survives restarts) vs Amazon DynamoDB Vector Search (single-digit ms, vectors inside your existing table) — same Titan embeddings, measured. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![AWS](https://img.shields.io/badge/AWS-DynamoDB-orange) ![Strands](https://img.shields.io/badge/Strands-memory-blue) |
 | [03 - Graph Memory](03-graph-memory-demo/) | Vector memory can't reason over relationships. Store memories as a Neo4j knowledge graph and traverse it to answer multi-hop questions: before 1/4, after 4/4. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-tools+state-blue) |
 | [04 - Selective Memory](04-selective-memory-demo/) | What should your agent actually remember? Three selection mechanisms measured: agent tools (inline), your own 4-prompt extractor to S3 Vectors, and AgentCore's built-in strategies — keep/discard quality, turn overhead, and the ~53-85 s managed extraction lag nobody publishes. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-core_memory-blue) |
 | [05 - Memory Hygiene](05-memory-hygiene-demo/) | What an agent should NOT remember. A write-gate blocks poisoned/injected content; forget removes it. One poisoned fact contaminates 1 answer in key-value memory but 4/4 in a graph. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-write_gate-blue) |
@@ -56,20 +56,22 @@ def book_flight(offer_id: str, tool_context: ToolContext) -> str:
 
 **Research:** [Zep: Temporal Knowledge Graph](https://arxiv.org/abs/2501.13956) (Rasmussen et al., 2025) · [Amazon S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) · [Bedrock AgentCore Memory](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/built-in-strategies.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el)
 
-The traveler asks *"what should I avoid eating on this trip?"* — the answer is stored under `dietary_notes`, but the question names no key and shares no words with the note. Key-value memory misses; vector memory retrieves by meaning. Then the real decision: in-process index or managed storage? Same Titan V2 embeddings, same memories, measured:
+The traveler asks *"what should I avoid eating on this trip?"* — the answer is stored under `dietary_notes`, but the question names no key and shares no words with the note. Key-value memory misses; vector memory retrieves by meaning. Then the real decision: which vector backend fits your deployment? Same Titan V2 embeddings, same memories, measured:
 
 | Store | Finds the answer | Query latency | Survives restart |
 |-------|------------------|---------------|------------------|
 | Key-value (keyword scan) | No | — | with a session manager |
 | FAISS (in-process) | Yes | <0.1 ms | No |
 | Amazon S3 Vectors (managed) | Yes | ~170-200 ms | Yes (verified) |
+| Amazon DynamoDB Vector Search | Yes | single-digit ms | Yes (verified) |
 
-The honest footnote: embedding the question (~0.5 s with Titan V2) dominates and costs the same for both backends.
+The honest footnote: embedding the question (~0.5 s with Titan V2) dominates and costs the same for all vector backends.
 
 | Backend | What you manage | Scope |
 |---------|-----------------|-------|
 | **FAISS** (in-process) | You build and hold the index in memory | Manual, per-process |
 | **Amazon S3 Vectors** | Managed storage: you create the bucket + index and call `put_vectors` / `query_vectors` | One index per tenant / memory type |
+| **Amazon DynamoDB Vector Search** | Vector index inside your existing DynamoDB table — one service, one billing model | Collocated with operational data |
 
 ---
 

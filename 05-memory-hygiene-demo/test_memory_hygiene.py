@@ -120,9 +120,8 @@ def run_test_3_agent_harness():
     agent = Agent(
         model=MODEL,
         system_prompt=(
-            "You are a travel assistant. Use remember_gated to store facts the user gives "
-            "you verbatim (pass the user's exact words as content), and recall_memory to "
-            "look them up. Be concise."
+            "You are a travel assistant with memory. Store facts the user gives you verbatim — "
+            "their exact words, not a paraphrase. Be concise."
         ),
         tools=[kv.remember_gated, kv.recall_memory],
         callback_handler=None,

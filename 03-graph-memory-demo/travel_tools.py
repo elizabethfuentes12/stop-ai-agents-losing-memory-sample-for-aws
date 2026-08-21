@@ -1,24 +1,32 @@
 """Strands tools for the graph-memory travel assistant.
 
-This is the "harness" half of the demo. Plugging an external graph store into an
-agent is *just tools + state* with Strands: the agent calls ``@tool`` functions to
-write and read its graph memory, and the framework runs the loop. You do not
-hand-roll the tool-calling protocol or the wiring.
+Plugging an external graph store into an agent is *just tools + state* with Strands:
+the agent calls ``@tool`` functions to write and read its graph memory, and the
+framework runs the loop.
 
-Three tools:
-  - ``remember_fact``   — the agent records a new fact as a graph edge (write path).
-  - ``recall_semantic`` — the "before" retrieval: pure vector similarity.
-  - ``recall_graph``    — the "after" retrieval: vector similarity + graph traversal.
+Six tools split into two groups:
+
+  Travel tools (what the assistant does):
+  - ``search_flights``   — search live flight offers.
+  - ``book_flight``      — confirm a booking and store what was learned in the graph.
+  - ``best_time_to_visit`` — historical climate to answer "when should I go to X?".
+
+  Memory tools (how the assistant remembers):
+  - ``remember_fact``    — record a new fact as a graph edge (write path).
+  - ``recall_semantic``  — retrieve by vector similarity only.
+  - ``recall_graph``     — retrieve by similarity + graph traversal (multi-hop).
 
 The Neo4j driver, database name, and embedder are process-level singletons created
 once from the env config (a live driver is not JSON-serializable, so it does not go
-in ``agent.state``). ``remember_fact`` additionally logs each stored fact into
-``agent.state`` — a small, serializable record of what the agent believes it has
-written, which shows the graph store and agent state working together.
+in ``agent.state``).
 """
+
+import json
 
 from strands import tool, ToolContext
 
+import flights_api
+import weather_api
 import graph_memory as gm
 
 # ── Process-level connections (created once, reused across tool calls) ───────
@@ -111,7 +119,7 @@ def recall_semantic(query: str, top_k: int = 3) -> str:
         top_k: How many memory entries to return (default 3).
     """
     driver, db, embedder = _require_memory()
-    retriever = gm.make_before_retriever(driver, db, embedder)
+    retriever = gm.make_semantic_retriever(driver, db, embedder)
     result = retriever.search(query_text=query, top_k=top_k)
     if not result.items:
         return "No matching memories."
@@ -132,9 +140,115 @@ def recall_graph(query: str, top_k: int = 3) -> str:
         top_k: How many traversal results to return (default 3).
     """
     driver, db, embedder = _require_memory()
-    retriever = gm.make_after_retriever(driver, db, embedder)
+    retriever = gm.make_graph_retriever(driver, db, embedder)
     result = retriever.search(query_text=query, top_k=top_k)
     if not result.items:
         return "No connected memories found."
     lines = [f"  - {item.content}" for item in result.items]
     return "Connected memories (similarity + graph traversal):\n" + "\n".join(lines)
+
+
+# ── Travel tools ──────────────────────────────────────────────────────────────
+
+@tool
+def search_flights(origin: str, destination: str, departure_date: str,
+                   cabin_class: str = "economy") -> str:
+    """Search live flight offers when the user wants to fly somewhere on a date.
+
+    Use this when the user:
+    - asks for flights between two airports ("find me a flight to Madrid")
+    - wants options or prices for a route on a date
+    - asks what's available for a destination
+
+    Args:
+        origin: IATA airport code of departure, e.g. "JFK".
+        destination: IATA airport code of arrival, e.g. "MAD".
+        departure_date: ISO date, e.g. "2026-10-15".
+        cabin_class: One of: economy, premium_economy, business, first.
+
+    Returns:
+        JSON list of offers sorted by price (offer_id, price, currency, cabin,
+        slices with carrier and stops).
+    """
+    offers = flights_api.search_offers(origin, destination, departure_date,
+                                       cabin_class, max_results=4)
+    return json.dumps(offers, indent=1)
+
+
+@tool(context=True)
+def book_flight(offer_id: str, tool_context: ToolContext) -> str:
+    """Confirm a booking and store what was learned in graph memory.
+
+    Use this when the user picks a specific offer and wants to book it. The booking
+    records the chosen airline and destination as graph edges so the knowledge graph
+    grows with the user's travel history.
+
+    Args:
+        offer_id: The offer id from a previous search result.
+
+    Returns:
+        Booking confirmation with the edges written to the graph.
+    """
+    offer = flights_api.get_offer(offer_id)
+    if offer is None:
+        return f"Offer '{offer_id}' not found or expired. Search again for a fresh offer."
+
+    carriers = sorted({
+        seg["carrier"]
+        for sl in offer["slices"]
+        for seg in sl["segments"]
+        if seg["carrier"]
+    })
+    destinations = sorted({sl["destination"] for sl in offer["slices"]})
+
+    driver, db, _ = _require_memory()
+    edges_written = []
+
+    with driver.session(database=db) as session:
+        for carrier in carriers:
+            session.run(
+                f"MERGE (a:{gm.NODE_LABEL} {{name: $s}}) "
+                f"MERGE (b:{gm.NODE_LABEL} {{name: $o}}) "
+                f"MERGE (a)-[:BOOKED_WITH]->(b)",
+                s="User", o=carrier,
+            )
+            edges_written.append(f"User -[BOOKED_WITH]-> {carrier}")
+
+        for dest in destinations:
+            session.run(
+                f"MERGE (a:{gm.NODE_LABEL} {{name: $s}}) "
+                f"MERGE (b:{gm.NODE_LABEL} {{name: $o}}) "
+                f"MERGE (a)-[:TRAVELED_TO]->(b)",
+                s="User", o=dest,
+            )
+            edges_written.append(f"User -[TRAVELED_TO]-> {dest}")
+
+    log = tool_context.agent.state.get("remembered_facts") or []
+    for edge in edges_written:
+        parts = edge.split(" -[")
+        subj, rest = parts[0], parts[1]
+        rel, obj = rest.rstrip("]->").split("]-> ")
+        log.append({"subject": subj, "relation": rel, "object": obj})
+    tool_context.agent.state.set("remembered_facts", log)
+
+    return json.dumps({
+        "status": "CONFIRMED",
+        "offer_id": offer_id,
+        "cabin": offer["cabin"],
+        "price": offer["price"],
+        "currency": offer["currency"],
+        "edges_written_to_graph": edges_written,
+    })
+
+
+@tool
+def best_time_to_visit(city: str) -> str:
+    """Answer 'when should I visit X?' with historical climate data by month.
+
+    Use this when the user asks about the best season to visit a city, whether it
+    will be hot, rainy, or cold on a planned trip, or for general travel timing advice.
+
+    Args:
+        city: City name, e.g. "Madrid", "Tokyo", "New York".
+    """
+    return weather_api.best_time_to_visit(city)

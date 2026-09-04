@@ -181,7 +181,12 @@ def run_test_2_graph():
                 "blast_gated": gated["contaminated"], "blast_cleaned": cleaned["contaminated"],
                 "total": poisoned["total"]}
     finally:
-        driver.close()
+        # Full teardown: clear the demo's nodes + index and DROP the isolated
+        # database (guarded so the shared default DB is never dropped).
+        try:
+            hg.teardown_graph(driver, db)
+        finally:
+            driver.close()
 
 
 class _fake_ctx:

@@ -181,6 +181,23 @@ def reset_graph(driver, db: str) -> None:
         session.run(f"MATCH (n:{NODE_LABEL}) DETACH DELETE n")
 
 
+def teardown_graph(driver, db: str) -> None:
+    """Full teardown: empty the demo graph, then DROP the isolated database entirely.
+
+    reset_graph() only clears :Memory nodes and the index (for rerun-safety). This
+    goes further and removes the whole `hygienedemo` database, so nothing this demo
+    created is left behind. Guarded: never drops the shared default database (the
+    Community fallback), only the dedicated demo database.
+    """
+    reset_graph(driver, db)
+    if db == DEFAULT_DATABASE:
+        print(f"  running on the default database '{db}'; leaving it in place (only cleared this demo's nodes).")
+        return
+    with driver.session(database="system") as session:
+        session.run(f"DROP DATABASE {db} IF EXISTS")
+    print(f"  dropped database '{db}' (full teardown).")
+
+
 def _upsert_node(session, name: str, embedder) -> None:
     text = NODE_TEXT.get(name, f"{name}.")
     vector = embedder.embed_query(text)

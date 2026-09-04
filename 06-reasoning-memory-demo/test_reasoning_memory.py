@@ -196,7 +196,12 @@ def run_test_4_reverse_audit(driver, db):
                 "graph_found": len(graph_found), "control_clean": control_clean,
                 "kv_ids": kv_found, "graph_ids": graph_found}
     finally:
-        driver.close()
+        # Full teardown: clear the demo's nodes and DROP the isolated database
+        # (guarded so the shared default DB is never dropped).
+        try:
+            tg.teardown_graph(driver, db)
+        finally:
+            driver.close()
 
 
 if __name__ == "__main__":

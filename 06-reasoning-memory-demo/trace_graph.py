@@ -109,6 +109,23 @@ def reset_graph(driver, db: str) -> None:
         session.run(f"MATCH (n:{labels}) DETACH DELETE n")
 
 
+def teardown_graph(driver, db: str) -> None:
+    """Full teardown: clear the demo's nodes, then DROP the isolated database entirely.
+
+    reset_graph() only clears the demo's labels (for rerun-safety). This removes the
+    whole `reasoningdemo` database so nothing this demo created is left behind.
+    Guarded: never drops the shared default database (the Community fallback).
+    """
+    reset_graph(driver, db)
+    if db == DEFAULT_DATABASE:
+        print(f"  running on the default database '{db}'; leaving it in place (only cleared this demo's nodes).")
+        return
+    with driver.session(database="system") as session:
+        session.run(f"DROP DATABASE {db} IF EXISTS")
+    print(f"  dropped database '{db}' (full teardown).")
+
+
+
 # ── Writing traces as graph chains ────────────────────────────────────────────
 def write_trace(driver, db: str, trace: dict) -> None:
     """Store one decision trace as a node chain with evidence provenance.

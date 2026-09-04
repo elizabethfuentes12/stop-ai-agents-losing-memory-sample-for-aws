@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 .venv/
+.venv-*/
 venv/
 env/
 test_env/
@@ -11,6 +12,11 @@ test_env/
 dist/
 build/
 *.whl
+
+# Scratch/throwaway scripts (agent-generated helpers like _patch.py, _poc.py, _dedash.py)
+# Keep package markers (__init__.py) which legitimately start with underscore.
+_*.py
+!__init__.py
 
 # Internal planning docs (not part of the public sample)
 docs/

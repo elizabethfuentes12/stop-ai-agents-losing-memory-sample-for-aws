@@ -2,8 +2,8 @@
 Architecture diagram for the selective memory demo.
 
 Shows the 3 selection mechanisms side by side:
-  A — agent tools inline (couples selection to turn latency)
-  B — own extractor off-path (4 typed prompts → S3 Vectors)
+  A — agent tools with a memory sub-agent (selection delegated per tool call)
+  B — own extractor off-path (4 typed prompts → S3 Vectors or DynamoDB)
   C — AgentCore managed (async, ~53-85 s lag)
 
 Run: uv run python generate_architecture.py
@@ -67,9 +67,9 @@ rbox(ax, 1.4, 4.4, 2.3, 3.2,
 
 # ── Column headers ────────────────────────────────────────────────────────────
 cols = [
-    (4.7,  "A — Inline", "Agent tools",       TEAL),
-    (8.0,  "B — Off-path", "Own extractor",    BLUE),
-    (11.5, "C — Managed", "AgentCore",         ORANGE),
+    (4.7,  "A — Agent tools", "Memory sub-agent",  TEAL),
+    (8.0,  "B — Off-path", "Own extractor",         BLUE),
+    (11.5, "C — Managed", "AgentCore",              ORANGE),
 ]
 for cx, h1, h2, col in cols:
     ax.text(cx, 7.0, h1, ha="center", fontsize=13, fontweight="bold", color=col)
@@ -77,10 +77,10 @@ for cx, h1, h2, col in cols:
     ax.plot([cx - 1.3, cx + 1.3], [6.6, 6.6], color=col, lw=1.5, alpha=0.4)
 
 # ── Mechanism A ───────────────────────────────────────────────────────────────
-arrow(ax, 2.56, 5.5, 3.7, 5.5, TEAL, label="every turn")
+arrow(ax, 2.56, 5.5, 3.7, 5.5, TEAL, label="when worth it")
 
-rbox(ax, 4.7, 5.5, 2.3, 0.75, "Agent selects inline",
-     "core_memory_write / read", TEAL, WHITE)
+rbox(ax, 4.7, 5.5, 2.3, 0.75, "remember tool",
+     "→ memory sub-agent (own LLM)", TEAL, WHITE, 10, 8)
 
 arrow(ax, 4.7, 5.12, 4.7, 4.5, TEAL)
 rbox(ax, 4.7, 4.15, 2.0, 0.55, "agent.state", "key-value store", TEAL, WHITE, 10, 8)
@@ -91,9 +91,9 @@ res_a = FancyBboxPatch((3.55, 2.4), 2.3, 0.88,
                         boxstyle="round,pad=0.02", linewidth=1.5,
                         facecolor="#EBF7F4", edgecolor=TEAL, zorder=4)
 ax.add_patch(res_a)
-ax.text(4.7, 3.18, "4/5 kept · 0 decoys", ha="center", fontsize=10,
+ax.text(4.7, 3.18, "5/5 kept · 0 decoys", ha="center", fontsize=10,
         color=TEAL, fontweight="bold", zorder=5)
-ax.text(4.7, 2.74, "~1.5-2.5 s/turn overhead\nAvailable: immediately", ha="center",
+ax.text(4.7, 2.74, "~2.1-2.8 s/turn (sub-agent)\nAvailable: immediately", ha="center",
         fontsize=8.5, color=SLATE, zorder=5)
 
 # ── Mechanism B ───────────────────────────────────────────────────────────────
@@ -103,8 +103,8 @@ rbox(ax, 8.0, 4.4, 2.5, 0.75, "4 extraction prompts",
      "facts · prefs · summary · episodes", BLUE, WHITE, 9.5, 8)
 
 arrow(ax, 8.0, 4.02, 8.0, 3.4, BLUE)
-rbox(ax, 8.0, 3.1, 2.2, 0.55, "Amazon S3 Vectors",
-     "4 typed indexes · Titan V2", BLUE, WHITE, 10, 8)
+rbox(ax, 8.0, 3.1, 2.2, 0.55, "S3 Vectors / DynamoDB",
+     "4 typed partitions · Titan V2", BLUE, WHITE, 9.5, 8)
 
 arrow(ax, 8.0, 2.82, 8.0, 2.3, BLUE)
 res_b = FancyBboxPatch((6.85, 1.3), 2.3, 0.88,
@@ -113,7 +113,7 @@ res_b = FancyBboxPatch((6.85, 1.3), 2.3, 0.88,
 ax.add_patch(res_b)
 ax.text(8.0, 2.08, "5/5 kept · 0 decoys  [best quality]", ha="center", fontsize=10,
         color=BLUE, fontweight="bold", zorder=5)
-ax.text(8.0, 1.64, "0 s overhead · off-path\nAvailable: ~4 s/turn", ha="center",
+ax.text(8.0, 1.64, "0 s overhead · off-path\nAvailable: ~4.7 s/turn", ha="center",
         fontsize=8.5, color=SLATE, zorder=5)
 
 # ── Mechanism C ───────────────────────────────────────────────────────────────

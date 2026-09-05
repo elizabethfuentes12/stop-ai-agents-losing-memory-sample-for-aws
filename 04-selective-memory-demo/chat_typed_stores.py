@@ -1,5 +1,5 @@
 """
-Interactive flight assistant — SELECTIVE MEMORY, four typed stores (Mechanism B).
+Interactive flight assistant, SELECTIVE MEMORY, four typed stores (Mechanism B).
 
 Chat with an agent whose memory is partitioned by TYPE: facts, preferences,
 trip_summary, episodes. Each type has its own vector store and its own
@@ -16,7 +16,7 @@ Try these, one per line, and watch which TYPE each lands in:
   "What do you know about me?"                               -> recalls across types
 
 Commands:  /memory  (show everything stored, by type)   /quit
-Backend:   VECTOR_BACKEND=s3 (default) or dynamodb  — set in .env.
+Backend:   VECTOR_BACKEND=s3 (default) or dynamodb , set in .env.
 """
 
 import os

@@ -29,4 +29,4 @@ Invoked by the `VectorStoreStack` during `cdk deploy` and `cdk destroy`.
 - `dynamodb:CreateTable`, `DescribeTable`, `DeleteTable`
 
 ## Layers / dependencies
-boto3-layer (boto3>=1.43.72) — required for S3 Vectors and DynamoDB Vector Search APIs.
+boto3-layer (boto3>=1.43.72), required for S3 Vectors and DynamoDB Vector Search APIs.

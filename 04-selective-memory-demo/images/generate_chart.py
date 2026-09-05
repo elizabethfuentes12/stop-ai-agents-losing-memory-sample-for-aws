@@ -3,7 +3,7 @@ Generate the selection-quality chart for the selective-memory demo.
 
 Numbers come from test_selective_memory.py (measured on the live demo):
 items kept, decoys leaked, and availability lag per mechanism.
-Deterministic scoring against planted ground truth — no LLM judge.
+Deterministic scoring against planted ground truth, no LLM judge.
 
 Run: uv run python generate_chart.py
 Output: selective-memory-mechanisms.png
@@ -22,7 +22,7 @@ fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 6))
 fig.patch.set_facecolor("white")
 
 # ── Left panel: selection quality (kept / decoys) ────────────────────────────
-mechanisms = ["A — agent\ntools", "B — own\nextractor", "C — AgentCore\nmanaged"]
+mechanisms = ["A, agent\ntools", "B, own\nextractor", "C, AgentCore\nmanaged"]
 kept   = [4, 5, 5]     # items correctly kept (of 5)
 decoys = [0, 0, 1]     # decoys that leaked (C is nondeterministic; median observed)
 TOTAL  = 5
@@ -55,7 +55,7 @@ ax1.set_xticklabels(mechanisms, fontsize=10)
 ax1.set_ylim(0, 6.5)
 ax1.set_yticks(range(0, 6))
 ax1.legend(loc="upper left", fontsize=10, framealpha=0.9)
-ax1.text(0.5, -0.18, "* C is nondeterministic — 0-2 decoys across runs",
+ax1.text(0.5, -0.18, "* C is nondeterministic, 0-2 decoys across runs",
          transform=ax1.transAxes, ha="center", fontsize=9, color="#666666")
 
 # ── Right panel: availability lag ────────────────────────────────────────────
@@ -80,7 +80,7 @@ ax2.text(0.5, -0.18, "A couples latency to the conversation; B and C are off-pat
 
 # ── Patches for the right panel legend ───────────────────────────────────────
 patches = [mpatches.Patch(color=c, label=l)
-           for c, l in [(TEAL, "A — inline"), (BLUE, "B — extractor"), (ORANGE, "C — AgentCore")]]
+           for c, l in [(TEAL, "A, inline"), (BLUE, "B, extractor"), (ORANGE, "C, AgentCore")]]
 ax2.legend(handles=patches, loc="upper left", fontsize=10, framealpha=0.9)
 
 fig.suptitle("3 Ways to Select What an AI Agent Remembers",

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — deploys the AgentMemoryAgentCoreStack for Demo 04.
+# deploy.sh, deploys the AgentMemoryAgentCoreStack for Demo 04.
 #
 # What it creates:
 #   - Amazon S3 Vectors bucket + 4 indexes (facts, prefs, summary, episodes) for
@@ -7,7 +7,7 @@
 #   - Amazon Bedrock AgentCore Memory with 4 built-in strategies (Mechanism C)
 #
 # After deploy, VECTOR_BUCKET and AGENTCORE_MEMORY_NAME are written to ../.env.
-# AgentCore Memory creation is asynchronous — the Lambda polls until ACTIVE
+# AgentCore Memory creation is asynchronous, the Lambda polls until ACTIVE
 # (can take up to ~10 minutes). Run `cdk destroy` to tear everything down.
 set -euo pipefail
 
@@ -22,7 +22,7 @@ ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
 REGION=$(aws configure get region 2>/dev/null || echo "us-east-1")
 
 echo "=========================================="
-echo "  Demo 04 — AgentCore + S3 Vectors deploy"
+echo "  Demo 04, AgentCore + S3 Vectors deploy"
 echo "  Account : $ACCOUNT"
 echo "  Region  : $REGION"
 echo "=========================================="
@@ -52,7 +52,7 @@ pip install botocore==1.43.72 s3transfer urllib3 jmespath python-dateutil six \
   --quiet
 echo "Layer built."
 
-# ── CDK bootstrap (idempotent — safe to run every time) ─────────────────────
+# ── CDK bootstrap (idempotent, safe to run every time) ─────────────────────
 cdk bootstrap "aws://$ACCOUNT/$REGION" --quiet
 
 # ── Deploy ───────────────────────────────────────────────────────────────────

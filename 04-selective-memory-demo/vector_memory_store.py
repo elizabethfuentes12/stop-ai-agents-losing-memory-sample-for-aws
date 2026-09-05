@@ -4,7 +4,7 @@ or Amazon DynamoDB Vector Search), with Amazon Titan Text Embeddings V2.
 This is the piece that lets Demo 04 run entirely on Strands' native memory
 framework. The `MemoryManager` orchestrates *when* to extract (triggers), *how*
 to extract (a `ModelExtractor` whose system prompt is the selection policy), and
-injects retrieved memories into the model — but it needs somewhere to persist and
+injects retrieved memories into the model, but it needs somewhere to persist and
 search. That "somewhere" is a `MemoryStore`, and this class implements that
 contract against a real vector backend so recall is semantic, not keyword.
 
@@ -42,7 +42,7 @@ class VectorMemoryStore(MemoryStore):
     """A Strands ``MemoryStore`` whose recall is semantic (Titan V2 + vector search).
 
     One instance == one vector partition (an S3 Vectors index or a DynamoDB table).
-    Use one store for a single flat memory, or several — one per memory type — to
+    Use one store for a single flat memory, or several, one per memory type, to
     reproduce AgentCore's per-strategy partitioning with the native SDK.
 
     Args:

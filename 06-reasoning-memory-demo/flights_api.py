@@ -1,6 +1,6 @@
 """Real flight search for the persistent-memory demo (Duffel sandbox).
 
-Every flight in this demo is a REAL offer returned by the Duffel API sandbox —
+Every flight in this demo is a REAL offer returned by the Duffel API sandbox -
 no hardcoded flight lists. The sandbox returns real airline inventory shapes
 (carriers, cabins, prices, durations) against test data, and the exact same
 code works in production by swapping the test token for a live one.
@@ -33,7 +33,7 @@ _TIMEOUT = 30
 
 # Offers captured once from the live sandbox (2026-07-16, JFK→CDG 2026-09-15) and used
 # ONLY as a fallback if the sandbox can't be reached after retries. Real captured values,
-# not invented — the same "capture ground truth once" pattern the sibling repos use.
+# not invented, the same "capture ground truth once" pattern the sibling repos use.
 _FALLBACK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fallback_offers.json")
 
 
@@ -56,7 +56,7 @@ def _duffel_headers() -> dict:
 def _simplify_offer(offer: dict) -> dict:
     """Reduce a raw Duffel offer to the fields the agent needs (keeps context small).
 
-    Cabin is not a top-level offer field in the Duffel response — it lives per
+    Cabin is not a top-level offer field in the Duffel response, it lives per
     segment-passenger as ``cabin_class_marketing_name`` (verified live 2026-07-16),
     so we read it from the first segment's first passenger.
     """

@@ -1,10 +1,10 @@
-# What Should Your AI Agent Actually Remember? 3 Ways to Build Selective Memory
+# AI Agent Memory: What to Store and What to Throw Away
 
-![What should your AI agent actually remember: a robot files useful facts, preferences, and events by type while filtering out small talk, weather, and opinions](images/ai-agent-selective-memory-cover.png)
+![AI agent memory, what to store and what to throw away: a robot files useful facts, preferences, and events by type while throwing small talk, weather, and opinions into the trash](images/ai-agent-selective-memory-cover.png)
 
-**Problem:** A real conversation mixes durable facts, throwaway small talk, preferences, and events. Store everything and memory becomes expensive and dirty ([Demo 05](../05-memory-hygiene-demo/) shows it's also dangerous); store nothing and the agent forgets its user (Demo 01, Test 1).
+**Problem:** Everyone races to make agents remember *more*, but the agent that wins keeps the right things and throws the rest away. Store everything and memory becomes expensive, slow, and dirty ([Demo 05](../05-memory-hygiene-demo/) shows it's also dangerous); store nothing and the agent forgets its user (Demo 01, Test 1).
 
-**Solution:** **Selection** means deciding what deserves to persist, in which memory *type*, and what to ignore. This demo builds it three ways and measures them against the same planted conversation with deterministic ground truth.
+**Solution:** **Selection** (memory extraction) decides what to keep, in which memory *type*, and what to throw away. This demo builds it three ways and measures them against the same planted conversation with deterministic ground truth.
 
 The first two mechanisms run entirely on **Strands Agents' native memory framework** with no hand-rolled memory tools, no memory logic in the chat agent's system prompt. The third is fully managed by AWS ([Amazon Bedrock AgentCore Memory](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/built-in-strategies.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el)). Storage is [Amazon S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) or [Amazon DynamoDB Vector Search](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/vector-search.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el).
 
@@ -58,13 +58,13 @@ agent = Agent(model=MODEL, system_prompt="You are a flight assistant.",  # perso
 
 ## The three mechanisms
 
-| Mechanism | What it is | Selection prompt | Partitions |
-|-----------|------------|------------------|------------|
-| **A: native, one store** | `MemoryManager` + one `VectorMemoryStore` | one general prompt | one |
-| **B: native, four typed stores** | `MemoryManager` + four `VectorMemoryStore`s | one prompt per type | four (facts / prefs / trip_summary / episodes) |
-| **C: AgentCore Memory** | fully managed by AWS | not yours to tune | managed |
+| Mechanism | What it is | Who owns the policy | Partitions |
+|-----------|------------|---------------------|------------|
+| **A: native, one store** | `MemoryManager` + one `VectorMemoryStore` | you (one general prompt) | one |
+| **B: native, four typed stores** | `MemoryManager` + four `VectorMemoryStore`s | you (one prompt per type) | four (facts / prefs / trip_summary / episodes) |
+| **C: Amazon Bedrock AgentCore Memory** | fully managed by AWS | AWS (managed, or override) | managed |
 
-**A vs B is granularity, not backend.** A is the simplest native setup (one store, one prompt); B reproduces AgentCore's per-type partitioning with the native SDK: the criteria AgentCore ships built-in become text you own. **The vector backend is an orthogonal lever** (`VECTOR_BACKEND=s3|dynamodb`) that applies equally to A and B. C is the fully managed counterpart to B: send raw turns via `create_event`, AWS extracts.
+**A vs B is granularity, not backend.** A is the simplest native setup (one store, one prompt); B reproduces AgentCore's per-type partitioning with the native SDK, so the criteria AgentCore ships built-in become text you own. **The vector backend is a separate lever** (`VECTOR_BACKEND=s3|dynamodb`) that applies to both A and B. C is the fully managed counterpart: send raw turns via the official session manager, AWS extracts.
 
 The four memory types run through the whole series:
 
@@ -77,42 +77,26 @@ The four memory types run through the whole series:
 
 ---
 
-## The measured result (real runs, yours will vary)
+## The measured result (your numbers will vary)
 
-Planted ground truth: **5 keepers** (2 facts, 2 preferences, 1 episode) and **3 decoys** (small talk, passing opinion, ephemeral weather). Deterministic scoring, no LLM judge.
+![Storing everything is not memory quality: a jar that stores everything reaches perfect recall but keeps the junk, while a selective jar keeps recall high and drops the noise](images/ai-agent-selective-memory-store-everything-vs-selective.png)
 
-### Why these metrics
+The test conversation mixes **5 keepers** (2 facts, 2 preferences, 1 episode) with **3 decoys** to throw away (small talk, a passing opinion, ephemeral weather). The score is **selection recall**: how many of the 5 keepers a mechanism stored, checked deterministically (no LLM judge). The decoys are there so a mechanism cannot win by hoarding.
 
-Scoring memory by *how much it stored* is the wrong instinct, and the memory-eval literature is blunt about it: a system that stores **everything** gets perfect recall and is still useless, because it also stored the junk (PrecisionMemBench, 2026, shows a store that dumps its whole belief set scores recall 1.0 and fails on precision). So this demo scores selection on **two axes**, and treats raw stored count as transparency, not a score:
+All three run on the native `MemoryManager`; what changes is who writes the keep/throw-away policy. From 20 runs each for A and B, repeated runs for C (gpt-4o-mini; recall varies run to run, your numbers will differ):
 
-![Storing everything is not memory quality: a jar that stores everything reaches perfect recall but zero noise isolation, while a selective jar keeps recall high and rejects the noise](images/ai-agent-selective-memory-store-everything-vs-selective.png)
-
-| Metric | Question | Why it matters |
-|--------|----------|----------------|
-| **Selection recall** | Did the keepers get stored? (kept / 5) | Drop durable facts and the agent forgets its user. The half everyone measures. |
-| **Noise isolation** | Did the decoys stay out? (decoys rejected / 3) | The half most demos skip. Storing small talk makes memory expensive, slow, and dirty, and contaminates later answers. |
-| **Turn latency** | How long is a turn? (ms/turn) | Secondary but real: extraction that runs on the turn (A, B) makes the turn slower but the memory ready immediately; moving it off the turn (C) makes the turn fast but the memory late. |
-| **When queryable** | How soon can you actually read the memory back? (s) | The extract-embed-index work is never free; a managed pipeline may accept the write in ~0.4 s but expose the memory ~a minute later. |
-| **Retrieval granularity** | Can you read/tune one memory type alone? | One blended pool (A) vs typed partitions (B): this, not accuracy, is what separates A from B. |
-
-Freshness, contradiction handling, and forgetting are the other memory dimensions worth evaluating (Future AGI, 2026); forgetting is the subject of [Demo 05](../05-memory-hygiene-demo/).
-
-| Mechanism | Selection recall | Noise isolation | Retrieval granularity | Turn latency | When queryable |
-|-----------|:---------------:|:---------------:|-----------------------|--------------|----------------|
-| A: native, one store | **5/5** | **3/3** | one blended pool | ~4.5 s/turn (extract + embed + write) | when the turn returns (~4.5 s) |
-| B: native, four typed stores | 4-5/5* | **3/3** | **per type** (query/inject/tune each type alone) | ~4.1 s/turn (extract + embed + write) | when the turn returns (~4.1 s) |
-| C: AgentCore managed | 5/5 | **1/3** (2 decoys leaked) | per strategy, not yours to tune | ~0.4 s/turn (`create_event` only) | **~106 s later** (measured) |
-
-\* B's per-type extraction is nondeterministic run to run; it kept the decoys out every time in testing.
-
-**A and B score almost the same on recall and noise isolation on purpose: that is not the axis where B pays off.** Both use a prompt you own, so both keep the junk out. B's win is **organization**, not accuracy: four typed partitions instead of one blended pool, so you can retrieve or inject one type at a time, tune the keep/discard criteria per type, and scale each independently. Pick A for one flat memory; pick B when types must stay separate.
+| Mechanism | Selection recall | Who owns the policy | When queryable |
+|-----------|:---------------:|---------------------|----------------|
+| A: native, one store | ~3.9/5 | you (one prompt) | when the turn returns (~3.2 s) |
+| B: native, four typed stores | **~5/5** | you (one prompt per type) | when the turn returns (~3.5 s) |
+| C: Amazon Bedrock AgentCore Memory | **5/5** | AWS (managed, or override) | ~20-55 s later (async) |
 
 **What the numbers teach:**
-- **Nothing here is instant.** Every mechanism runs the extractor, embeds with Titan V2, and writes to a vector store. A and B pay that cost **inside the turn** (~4.5 s / ~4.1 s is exactly that work), so the memory is ready when the turn returns. C pays it **outside the turn**: `create_event` returns in ~0.4 s, then AWS extracts, embeds, and indexes asynchronously, so the memory lands ~106 s later. Same embedding cost, moved off the critical path.
-- **A vs B is a structure choice, not a quality contest**: same recall and noise isolation, different retrieval granularity (blended pool vs typed partitions).
-- **A and B keep the junk out (noise isolation 3/3)** because the selection prompt is yours: they reject small talk, weather, and passing opinions.
-- **C is the cheapest write (~0.4 s) with no pipeline to maintain**, but the extract-embed-index work still runs, just asynchronously: extraction lands ~a minute later (measured ~106 s) and leaked 2 decoys (noise isolation 1/3); its criteria aren't yours to tune.
-- **Stored count is never the score.** A dump would show a high count and a great recall while failing noise isolation.
+- **All three recall the keepers well.** The difference is how much of the selection policy you hold, not which one is "better".
+- **B is the sharpest when you own every criterion.** One non-overlapping prompt per type keeps each store to its own kind of memory, so recall lands ~5/5 every run. Choose B when the keep/throw-away rules are yours to define and tune per type.
+- **A is the same idea with one prompt.** You own the policy at a coarser grain; recall runs a touch lower and noisier (~3.9/5). Choose A when one flat memory is enough.
+- **C lets AWS run the pipeline.** You send raw turns and the managed strategies extract, embed, and index server-side, with nothing to maintain. Extraction is asynchronous, so the memory lands ~20-55 s after the turn. If you want to shape what it keeps, use [custom strategies with prompt overrides](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/long-term-configuring-custom-strategies.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el).
+- **B reproduces AgentCore's per-type partitioning with the native SDK**, so the built-in criteria become text you own.
 
 ## The decision table
 
@@ -220,26 +204,29 @@ GENERAL_SELECTION_PROMPT = (
 
 Four `VectorMemoryStore`s, each with its own `ModelExtractor` prompt and its own vector partition: AgentCore's per-strategy partitioning, native SDK. Each prompt keeps one type and returns `[]` for the rest.
 
-### When is a memory actually saved? (`flush`)
+### When is a memory saved? (`flush`)
 
 Extraction runs in the background, so the last turn's memory may not be persisted when the agent finishes responding. `await manager.flush()` forces every store to save its buffered messages and waits for those writes (the synchronization point for a graceful shutdown. **This demo uses the synchronous `agent("...")` path, where the framework flushes after each invocation, so we never call `flush()` manually.** With the async APIs (`invoke_async` / `stream_async`) you'd `await memory_manager.flush()` yourself at shutdown. (Don't flush every turn alongside a periodic trigger) it defeats the trigger's schedule.)
 
-### C: AgentCore facts verified by running (not in the docs)
+### Practical notes for the managed path (C)
 
-- `episodicMemoryStrategy` **requires** `reflectionConfiguration.namespaces`: a bare `{"name": ...}` fails with a blank `ValidationException`.
-- A memory in `CREATING` status can't be deleted: wait for `ACTIVE`.
-- Retrieval namespaces: `/strategies/{strategyId}/actors/{actorId}/`: summary and episodic records live under `/sessions/{sessionId}/`.
-- Extraction lag measured at ~106 s (≈ a minute) for this short conversation.
+Wiring up Amazon Bedrock AgentCore Memory through the [official Strands session manager](https://strandsagents.com/docs/integrations/session-managers/agentcore-memory/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) (`AgentCoreMemorySessionManager`):
+
+- **Give each strategy an explicit namespace at creation** (`/facts/{actorId}/`, `/preferences/{actorId}/`, `/summaries/{actorId}/{sessionId}/`, `/episodes/{actorId}/{sessionId}/`). The namespace you set on the strategy is the one you reference in `RetrievalConfig`.
+- **Use `RetrievalConfig(relevance_score=...)`** to keep only records above a relevance threshold per namespace.
+- **Extraction is asynchronous.** The memory became queryable ~20-55 s after the turn (measured, polling until it settled). Plan for eventual consistency.
+- **A memory in `CREATING` status isn't ready.** Wait for `ACTIVE` before sending events.
+- **To shape what the managed strategies keep,** use [custom strategies with prompt overrides](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/long-term-configuring-custom-strategies.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el): your own prompt and model on top of the managed pipeline.
 
 ---
 
 ## Learning Objectives
 
-1. Frame memory selection as its own capability: what to keep, in which type, what to ignore
+1. Frame memory selection as its own capability: what to keep, in which type, what to throw away
 2. Use Strands' **native** memory framework end to end: `MemoryManager`, a `MemoryStore`, a `ModelExtractor`, triggers, and injection
 3. Own the selection policy (the extractor's system prompt) while the SDK orchestrates extraction and retrieval
 4. Compare framework-managed selection (A, B) against fully managed AWS selection (C: AgentCore)
-5. Measure what matters: keep/discard quality, turn overhead, availability lag
+5. Measure selection recall, who owns the keep/throw-away policy, turn latency, and when the memory is queryable
 
 ---
 

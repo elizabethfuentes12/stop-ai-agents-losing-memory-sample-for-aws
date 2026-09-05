@@ -6,7 +6,7 @@ class SessionsBucket(Construct):
     """Private S3 bucket for Strands S3SessionManager.
 
     The bucket name is auto-generated (unique per account/region).
-    No account ID is hardcoded — CDK emits it as a stack output.
+    No account ID is hardcoded, CDK emits it as a stack output.
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:

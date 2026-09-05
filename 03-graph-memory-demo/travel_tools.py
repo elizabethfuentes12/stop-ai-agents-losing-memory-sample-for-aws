@@ -7,14 +7,14 @@ framework runs the loop.
 Six tools split into two groups:
 
   Travel tools (what the assistant does):
-  - ``search_flights``   — search live flight offers.
-  - ``book_flight``      — confirm a booking and store what was learned in the graph.
-  - ``best_time_to_visit`` — historical climate to answer "when should I go to X?".
+  - ``search_flights``  , search live flight offers.
+  - ``book_flight``     , confirm a booking and store what was learned in the graph.
+  - ``best_time_to_visit``, historical climate to answer "when should I go to X?".
 
   Memory tools (how the assistant remembers):
-  - ``remember_fact``    — record a new fact as a graph edge (write path).
-  - ``recall_semantic``  — retrieve by vector similarity only.
-  - ``recall_graph``     — retrieve by similarity + graph traversal (multi-hop).
+  - ``remember_fact``   , record a new fact as a graph edge (write path).
+  - ``recall_semantic`` , retrieve by vector similarity only.
+  - ``recall_graph``    , retrieve by similarity + graph traversal (multi-hop).
 
 The Neo4j driver, database name, and embedder are process-level singletons created
 once from the env config (a live driver is not JSON-serializable, so it does not go
@@ -69,7 +69,7 @@ def _require_memory():
 def remember_fact(subject: str, relation: str, obj: str, tool_context: ToolContext) -> str:
     """Record a fact in graph memory as a relationship between two entities.
 
-    Use this whenever the user reveals a durable fact worth remembering — who they
+    Use this whenever the user reveals a durable fact worth remembering, who they
     met, where a place is, what style something is. Stored as a graph edge so it can
     later be traversed to answer multi-hop questions.
 
@@ -97,7 +97,7 @@ def remember_fact(subject: str, relation: str, obj: str, tool_context: ToolConte
             s=subject, o=obj,
         )
 
-    # Also log the write into agent.state — a serializable trace of what the agent
+    # Also log the write into agent.state, a serializable trace of what the agent
     # believes it has stored (the graph itself is the source of truth).
     log = tool_context.agent.state.get("remembered_facts") or []
     log.append({"subject": subject, "relation": relation, "object": obj})
@@ -111,7 +111,7 @@ def recall_semantic(query: str, top_k: int = 3) -> str:
     """Recall memories by semantic similarity only (no relationship traversal).
 
     Returns the individually most-similar memory entries. Good for "what do I know
-    about X" but blind to how memories connect — it cannot follow a chain of
+    about X" but blind to how memories connect, it cannot follow a chain of
     relationships to answer a multi-hop question.
 
     Args:

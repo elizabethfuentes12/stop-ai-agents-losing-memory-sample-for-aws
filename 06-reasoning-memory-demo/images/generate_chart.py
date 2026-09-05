@@ -3,7 +3,7 @@ Generate the reverse-audit chart for the reasoning memory demo.
 
 Numbers come from test_reasoning_memory.py (measured on the live demo): of 4 decisions
 whose evidence chain reaches the compromised source, how many each store's audit finds.
-Ground truth is fixed by construction of the seeded traces — deterministic checks, no
+Ground truth is fixed by construction of the seeded traces, deterministic checks, no
 LLM judge, no invented numbers.
 
 Run: uv run python generate_chart.py
@@ -41,7 +41,7 @@ for i, (f, m) in enumerate(zip(found, missed)):
         ax.text(i, f + m / 2, f"missed {m}", ha="center", va="center",
                 fontsize=12, fontweight="bold", color="white")
 
-ax.set_title('Reverse Audit: "This Source Was Wrong — Which Decisions Depended on It?"',
+ax.set_title('Reverse Audit: "This Source Was Wrong, Which Decisions Depended on It?"',
              fontsize=14, fontweight="bold", pad=16)
 ax.set_ylabel(f"Affected decisions (of {TOTAL})", fontsize=12)
 ax.set_xticks(x)

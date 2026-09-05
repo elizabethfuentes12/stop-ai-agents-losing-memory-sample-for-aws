@@ -6,7 +6,7 @@ from custom_resources import VectorStoreResources
 
 
 class VectorStoreStack(Stack):
-    """Stack for Demo 02 — S3 Vectors bucket+index and DynamoDB table+vector-index.
+    """Stack for Demo 02, S3 Vectors bucket+index and DynamoDB table+vector-index.
 
     Both services use Lambda-backed Custom Resources because native CloudFormation
     support was not available when these APIs were introduced (mid-2025).
@@ -26,7 +26,7 @@ class VectorStoreStack(Stack):
             code=lambda_.Code.from_asset("layers/boto3-layer"),
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[lambda_.Architecture.ARM_64],
-            description="boto3>=1.43.72 — S3 Vectors and DynamoDB Vector Search",
+            description="boto3>=1.43.72, S3 Vectors and DynamoDB Vector Search",
         )
 
         lambdas = VectorStoreLambdas(self, "Lambdas", boto3_layer=boto3_layer)
@@ -34,7 +34,7 @@ class VectorStoreStack(Stack):
         resources = VectorStoreResources(
             self, "VectorStore",
             cr_handler=lambdas.cr_handler,
-            # No account ID hardcoded — CDK Fn.sub resolves ${AWS::AccountId} at deploy time.
+            # No account ID hardcoded, CDK Fn.sub resolves ${AWS::AccountId} at deploy time.
             vector_bucket_name=cdk.Fn.sub("agent-memory-demo-vectors-${AWS::AccountId}"),
             vector_index_name="traveler-memories",
             dynamodb_table_name="agent-memory-demo-ddb",

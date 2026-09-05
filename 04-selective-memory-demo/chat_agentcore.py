@@ -1,5 +1,5 @@
 """
-Interactive flight assistant — MANAGED MEMORY (Mechanism C: AgentCore Memory).
+Interactive flight assistant, MANAGED MEMORY (Mechanism C: AgentCore Memory).
 
 Chat with an agent whose long-term memory is fully managed by Amazon Bedrock
 AgentCore Memory. You send raw turns (create_event); AWS's four built-in
@@ -9,7 +9,7 @@ index them for you. Nothing to tune, no pipeline to run.
 The honest trade-off you will SEE here: extraction is asynchronous. Right after
 you speak, `/memory` may show nothing, because AgentCore is still extracting
 (measured ~1 minute in this demo). Wait and run `/memory` again to watch the
-memories appear. That availability lag is the price of "managed".
+memories appear. That extraction lag is the price of "managed".
 
 Commands:
   /memory   retrieve what AgentCore has extracted so far, per strategy
@@ -68,7 +68,7 @@ def show_memory(memory_id, sids, actor, session) -> None:
         else:
             print(f"     [{name}] (nothing extracted yet)")
     if not any_found:
-        print("  (empty so far — AgentCore is still extracting; try /memory again in ~1 min, or /wait)")
+        print("  (empty so far, AgentCore is still extracting; try /memory again in ~1 min, or /wait)")
     print()
 
 

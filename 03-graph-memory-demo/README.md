@@ -11,7 +11,7 @@ Based on research:
 - [MAGMA: A Multi-Graph based Agentic Memory Architecture for AI Agents](https://arxiv.org/abs/2601.03236), Jiang et al., 2026
 - [GRAVITY: Architecture-Agnostic Structured Anchoring for Long-Horizon Conversational Memory](https://arxiv.org/abs/2605.01688), Sun et al., 2026
 
-This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) with [`neo4j-graphrag`](https://neo4j.com/docs/neo4j-graphrag-python/) for graph memory. The memory patterns are framework-agnostic and carry over to other agent frameworks.
+This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) with [`neo4j-graphrag`](https://neo4j.com/docs/neo4j-graphrag-python/) for graph memory.
 
 > **Official integration.** This demo wires Neo4j by hand on purpose, to expose the retrieval mechanics (the `VectorRetriever` vs `VectorCypherRetriever` contrast is the whole point). For production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/), that provides a `Neo4jSessionManager` you attach with `Agent(session_manager=...)` to auto-persist turns and inject graph memories. It is a Neo4j Labs package (community-supported), not part of the Strands SDK core, and it hides the low-level retrieval this demo teaches.
 

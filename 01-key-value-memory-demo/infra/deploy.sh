@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — deploys the AgentMemorySessionsStack for Demo 01.
+# deploy.sh, deploys the AgentMemorySessionsStack for Demo 01.
 #
 # What it creates:
 #   - Private S3 bucket for Strands S3SessionManager (Test 4)
@@ -19,7 +19,7 @@ ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
 REGION=$(aws configure get region 2>/dev/null || echo "us-east-1")
 
 echo "=========================================="
-echo "  Demo 01 — Sessions bucket deploy"
+echo "  Demo 01, Sessions bucket deploy"
 echo "  Account : $ACCOUNT"
 echo "  Region  : $REGION"
 echo "=========================================="
@@ -35,7 +35,7 @@ else
   pip install -q -r requirements.txt
 fi
 
-# ── CDK bootstrap (idempotent — safe to run every time) ─────────────────────
+# ── CDK bootstrap (idempotent, safe to run every time) ─────────────────────
 cdk bootstrap "aws://$ACCOUNT/$REGION" --quiet
 
 # ── Deploy ───────────────────────────────────────────────────────────────────

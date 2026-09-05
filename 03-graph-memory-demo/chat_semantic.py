@@ -1,5 +1,5 @@
 """
-Interactive travel assistant — SEMANTIC MEMORY only.
+Interactive travel assistant, SEMANTIC MEMORY only.
 
 Memory is stored as flat vectors. The agent can recall individual facts by
 similarity, but cannot follow relationships between them to answer multi-hop
@@ -12,8 +12,8 @@ Pre-loaded memory (what the agent already knows):
   Madrid        located in Spain
 
 Try these to explore the limits:
-  "Who do I know connected to flights to Spain?"    ← fails — no traversal
-  "What airlines do you know about?"                ← works — direct similarity
+  "Who do I know connected to flights to Spain?"    ← fails, no traversal
+  "What airlines do you know about?"                ← works, direct similarity
   "Find me a flight from JFK to MAD on 2026-10-15"
   "When is the best time to visit Madrid?"
   "Remember that Maya Torres is my travel agent"
@@ -62,7 +62,7 @@ agent = Agent(
 )
 
 print("\n" + "=" * 60)
-print("  TRAVEL ASSISTANT — semantic memory")
+print("  TRAVEL ASSISTANT, semantic memory")
 print("  recall_semantic · remember_fact · search_flights")
 print("=" * 60)
 print(__doc__)

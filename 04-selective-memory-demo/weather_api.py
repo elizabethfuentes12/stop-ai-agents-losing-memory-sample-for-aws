@@ -1,7 +1,7 @@
 """Real climate data for "when should I visit X?" (Open-Meteo, free, no API key).
 
 Answers the traveler question "what's the best time of year to visit Tokyo?" with
-REAL historical climate data — no hardcoded weather tables. Monthly averages are
+REAL historical climate data, no hardcoded weather tables. Monthly averages are
 computed from the Open-Meteo historical archive (ERA5 reanalysis), aggregating the
 last N full years of daily observations.
 

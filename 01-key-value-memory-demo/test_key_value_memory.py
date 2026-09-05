@@ -1,27 +1,27 @@
 """
-Demo: Stop Your AI Agent from Forgetting User Preferences — Key-Value Memory (Agent State)
+Demo: Stop Your AI Agent from Forgetting User Preferences, Key-Value Memory (Agent State)
 
 (The research literature calls this problem "memory decay". Strands calls this
 store "agent state": key-value storage that lives outside the conversation.)
 
 A brand-new user arrives with EMPTY memory. The demo isolates ONE variable across
 four tests: WHERE MEMORY LIVES. Same model, same tools' business logic, same
-3-turn conversation — the only change is the memory wiring, climbing one rung of
+3-turn conversation, the only change is the memory wiring, climbing one rung of
 durability per test. Everything is Strands built-ins.
 
-  Test 1: No memory tools    — the "memory" is just the transcript: nothing
+  Test 1: No memory tools   , the "memory" is just the transcript: nothing
                                structured is learned, and a restart wipes it all
-  Test 2: agent.state        — booking teaches it preferences (process memory)
-  Test 3: FileSessionManager — the profile survives an agent restart (local disk)
-  Test 4: S3SessionManager   — same, stored in Amazon S3 (production: no filesystem
+  Test 2: agent.state       , booking teaches it preferences (process memory)
+  Test 3: FileSessionManager, the profile survives an agent restart (local disk)
+  Test 4: S3SessionManager  , same, stored in Amazon S3 (production: no filesystem
                                to provision or mount, state shared across any compute)
 
-(The flight data behind the tools is live — Duffel sandbox + Open-Meteo — so
+(The flight data behind the tools is live, Duffel sandbox + Open-Meteo, so
 nothing is hardcoded, but the APIs are scenery: the experiment is memory.)
 
 Based on research:
-  - MemoryOS of AI Agent (https://arxiv.org/abs/2506.06326) — Kang et al., 2025
-  - Cognitive Memory in LLMs (https://arxiv.org/abs/2504.02441) — Shan et al., 2025
+  - MemoryOS of AI Agent (https://arxiv.org/abs/2506.06326), Kang et al., 2025
+  - Cognitive Memory in LLMs (https://arxiv.org/abs/2504.02441), Shan et al., 2025
 
 Requires: OPENAI_API_KEY (model) + DUFFEL_API_KEY (free sandbox token from
 https://app.duffel.com). Climate data (Open-Meteo) needs no key. Test 4 also
@@ -64,29 +64,29 @@ MODEL = OpenAIModel(model_id="gpt-4o-mini")  # api_key read from the OPENAI_API_
 # from strands.models import BedrockModel
 # MODEL = BedrockModel(model_id="openai.gpt-oss-120b-1:0", region_name="us-west-2")
 
-# Role and approach only — tool purposes live in the tools' own docstrings.
+# Role and approach only, tool purposes live in the tools' own docstrings.
 SYSTEM_PROMPT = (
     "You are a flight booking assistant for a returning traveler. "
     "Personalize recommendations using what you know about the user. "
-    "Be concise — answer in 2-3 sentences maximum."
+    "Be concise, answer in 2-3 sentences maximum."
 )
 
 # The same 3-turn conversation is used in every test, so the ONLY variable is memory.
 # A brand-new user: business-cabin taste revealed by their booking ACTION, not a form.
 TURN_1 = "Find me flights from JFK to Paris CDG on 2026-09-15, business class."
 TURN_2 = "Book the cheapest business option."
-TURN_3 = ("Now I need Paris CDG to Tokyo Haneda on 2026-09-22 — "
+TURN_3 = ("Now I need Paris CDG to Tokyo Haneda on 2026-09-22, "
           "what do you recommend based on what you know about me?")
 
 
 def run_test_1_stateless():
-    """Test 1: No memory tools — the only "memory" is the transcript itself.
+    """Test 1: No memory tools, the only "memory" is the transcript itself.
 
     Within the session the agent DOES personalize turn 3: Strands keeps the full
     conversation history (agent.messages) between calls, so "business class" is
     still in the transcript when the model answers. But nothing structured is
-    learned (user_preferences stays None), and a restart — a brand-new agent
-    instance, which is every new process/request in production — asks turn 3
+    learned (user_preferences stays None), and a restart, a brand-new agent
+    instance, which is every new process/request in production, asks turn 3
     with an empty transcript and gets a generic answer.
     """
     agent = Agent(
@@ -101,10 +101,10 @@ def run_test_1_stateless():
 
     prefs = agent.state.get("user_preferences")
     print(f"  user_preferences after 3 turns: {prefs}")
-    print(f"  messages in transcript: {len(agent.messages)} — the booking lives ONLY here")
+    print(f"  messages in transcript: {len(agent.messages)}, the booking lives ONLY here")
 
     # The restart: a new agent instance = new process/request in production.
-    # No session manager, so the transcript is gone — turn 3 has nothing to use.
+    # No session manager, so the transcript is gone, turn 3 has nothing to use.
     agent_restarted = Agent(
         model=MODEL,
         system_prompt=SYSTEM_PROMPT,
@@ -118,7 +118,7 @@ def run_test_1_stateless():
 
 
 def run_test_2_stateful():
-    """Test 2: agent.state — the booking ACTION teaches the agent its user.
+    """Test 2: agent.state, the booking ACTION teaches the agent its user.
 
     Same conversation. book_flight writes cabin/stops/price/carriers into
     agent.state; turn 3's search now ranks real offers by that profile.
@@ -142,7 +142,7 @@ def run_test_2_stateful():
 
 
 def run_test_3_persistence():
-    """Test 3: FileSessionManager — the profile survives an agent restart.
+    """Test 3: FileSessionManager, the profile survives an agent restart.
 
     Session A books (building the profile); Session B is a brand-new agent
     instance with the same session_id and starts already knowing the user.
@@ -208,10 +208,10 @@ def ensure_bucket(s3, bucket: str) -> None:
 
 
 def run_test_4_s3_persistence():
-    """Test 4: S3SessionManager — same restart survival, stored in Amazon S3.
+    """Test 4: S3SessionManager, same restart survival, stored in Amazon S3.
 
     Same interface as FileSessionManager, but the session persists as plain JSON
-    objects in an S3 bucket (regular S3 — no vectors, no embeddings). Why S3 over
+    objects in an S3 bucket (regular S3, no vectors, no embeddings). Why S3 over
     a filesystem in production: nothing to provision or mount (a durable filesystem
     on Lambda/Fargate means wiring up EFS: VPC, mount targets, security groups),
     and any compute instance can read the session without sharing a network drive.
@@ -243,7 +243,7 @@ def run_test_4_s3_persistence():
     prefs_a = agent_a.state.get("user_preferences")
     print(f"  Session A learned: {json.dumps(prefs_a)}")
 
-    agent_b = make_agent()  # new instance, same session_id — restored FROM S3
+    agent_b = make_agent()  # new instance, same session_id, restored FROM S3
     prefs_b = agent_b.state.get("user_preferences")
     survived = prefs_a == prefs_b and prefs_b is not None
     print(f"  Session B restored from s3://{bucket}/{prefix}: {json.dumps(prefs_b)}")
@@ -265,10 +265,10 @@ if __name__ == "__main__":
     r3 = run_test_3_persistence()
     r4 = run_test_4_s3_persistence()
 
-    # Comparison: measured results only — the narrative lives in the README.
+    # Comparison: measured results only, the narrative lives in the README.
     print(f"\n{'Test':<42} {'Learned prefs':>14} {'Survived restart':>17}")
-    print(f"{'1 — no memory tools (transcript only)':<42} {str(r1['prefs'] is not None):>14} {str(r1['survived']):>17}")
-    print(f"{'2 — agent.state':<42} {str(bool(r2['prefs'])):>14} {'—':>17}")
-    print(f"{'3 — agent.state + FileSessionManager':<42} {str(r3['learned']):>14} {str(r3['survived']):>17}")
-    print(f"{'4 — agent.state + S3SessionManager':<42} {str(r4.get('learned', '—')):>14} {str(r4['survived']):>17}")
+    print(f"{'1, no memory tools (transcript only)':<42} {str(r1['prefs'] is not None):>14} {str(r1['survived']):>17}")
+    print(f"{'2, agent.state':<42} {str(bool(r2['prefs'])):>14} {'-':>17}")
+    print(f"{'3, agent.state + FileSessionManager':<42} {str(r3['learned']):>14} {str(r3['survived']):>17}")
+    print(f"{'4, agent.state + S3SessionManager':<42} {str(r4.get('learned', '-')):>14} {str(r4['survived']):>17}")
     print(f"\nwall time: {time.time() - start:.0f}s (live Duffel + Open-Meteo calls)")

@@ -3,7 +3,7 @@ Generate the multi-hop recall chart for the graph memory demo.
 
 Numbers come from the deterministic scorecard in test_graph_memory.py (Test 4):
 4 multi-hop questions over the same known graph, checked against the known answer.
-Reproducible — no LLM judge, no invented benchmark numbers.
+Reproducible, no LLM judge, no invented benchmark numbers.
 
 Run: uv run python generate_chart.py
 Output: graph-memory-multihop.png
@@ -54,8 +54,8 @@ ax.set_axisbelow(True)
 ax.spines[["top", "right"]].set_visible(False)
 
 legend_patches = [
-    mpatches.Patch(color=RED, label="Semantic — finds related pieces, can't connect them"),
-    mpatches.Patch(color=GREEN, label="Graph — traverses relationships to the answer"),
+    mpatches.Patch(color=RED, label="Semantic, finds related pieces, can't connect them"),
+    mpatches.Patch(color=GREEN, label="Graph, traverses relationships to the answer"),
 ]
 ax.legend(handles=legend_patches, loc="upper left", fontsize=10, framealpha=0.9)
 

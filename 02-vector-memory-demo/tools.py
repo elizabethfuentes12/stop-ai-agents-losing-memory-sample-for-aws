@@ -1,14 +1,14 @@
-"""Tools for the vector-memory demo — remember by meaning, not by key.
+"""Tools for the vector-memory demo, remember by meaning, not by key.
 
 A returning traveler has accumulated memories over past conversations (notes,
 preferences, episodes). This demo's tools let a Strands agent write those
 memories and retrieve them THREE ways, so the tests can measure the difference:
 
-  - recall_by_key      — Demo 01's move: exact key lookup (needs to know the key)
-  - recall_semantic    — vector search (needs only the MEANING)
+  - recall_by_key     , Demo 01's move: exact key lookup (needs to know the key)
+  - recall_semantic   , vector search (needs only the MEANING)
 
 The semantic tool queries whichever vector backend the test wires in (FAISS
-in-process or Amazon S3 Vectors) — same embeddings, same memories, so the
+in-process or Amazon S3 Vectors), same embeddings, same memories, so the
 backends are interchangeable from the agent's point of view.
 
 Tool docstrings follow the research-backed pattern (ToolLLM/AgentTuning):
@@ -27,7 +27,7 @@ VECTOR = None      # FaissStore or S3VectorStore (same query interface)
 
 
 def init_stores(kv, vector) -> None:
-    """Wire the tools to the stores built by the test — call once at startup."""
+    """Wire the tools to the stores built by the test, call once at startup."""
     global KV, VECTOR
     KV, VECTOR = kv, vector
 
@@ -67,7 +67,7 @@ def remember_note(key: str, note: str) -> str:
 def recall_by_key(key: str) -> str:
     """Look up one memory when you KNOW its exact key.
 
-    Use this tool when the question maps to a known identifier —
+    Use this tool when the question maps to a known identifier -
     "what's my preferred cabin?" -> key "preferred_cabin".
 
     Args:
@@ -85,7 +85,7 @@ def recall_semantic(question: str, top_k: int = 3) -> str:
     """Retrieve the memories most relevant to a question BY MEANING.
 
     Use this tool when the user asks something their history could answer but
-    no key is obvious — "what should I avoid eating on this trip?",
+    no key is obvious, "what should I avoid eating on this trip?",
     "anything I said about long layovers?". The stored notes do not need to
     share any words with the question.
 

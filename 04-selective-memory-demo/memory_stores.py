@@ -1,14 +1,14 @@
 """Vector backends for the extractor (mechanism B): Amazon S3 Vectors and
-Amazon DynamoDB Vector Search — the same two managed backends compared in Demo 02.
+Amazon DynamoDB Vector Search, the same two managed backends compared in Demo 02.
 
-Demo 04 is about SELECTION — deciding *what* to remember, not which backend to use.
+Demo 04 is about SELECTION, deciding *what* to remember, not which backend to use.
 But the survivors have to land somewhere, and the choice of vector backend is the
 same trade-off Demo 02 measured. So mechanism B lets you pick:
 
   VECTOR_BACKEND=s3        -> Amazon S3 Vectors (dedicated vector bucket, one index per type)
   VECTOR_BACKEND=dynamodb  -> Amazon DynamoDB Vector Search (vector index inside a table)
 
-Both keep the demo's per-memory-type partitioning (one index/table per type — the
+Both keep the demo's per-memory-type partitioning (one index/table per type, the
 same partitioning Amazon Bedrock AgentCore Memory gives you managed), and both use
 the same Amazon Titan Text Embeddings V2 model, so the only thing that changes is
 where the vectors live.
@@ -20,7 +20,7 @@ where the vectors live.
     (added in boto3 1.43.72). Single-digit millisecond latency, on-demand billing.
 
 Self-provisioning (series rule): the bucket/index or table/index are created if
-missing — no console steps needed to run the demo.
+missing, no console steps needed to run the demo.
 
 Requires boto3 >= 1.43.72 for the DynamoDB backend (SearchVectors).
 """
@@ -42,7 +42,7 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 # Which backend mechanism B writes to. "s3" (default) or "dynamodb".
 VECTOR_BACKEND = os.getenv("VECTOR_BACKEND", "s3").lower()
 
-# DynamoDB backend config (one table per memory type — mirrors the S3 per-index
+# DynamoDB backend config (one table per memory type, mirrors the S3 per-index
 # partitioning; the demo builds the full name from a prefix + the memory type).
 DYNAMODB_TABLE_PREFIX = os.getenv("DYNAMODB_TABLE_PREFIX", "selective-memory")
 DYNAMODB_VECTOR_INDEX = os.getenv("DYNAMODB_VECTOR_INDEX", "memory-vector-index")
@@ -62,7 +62,7 @@ def _aws():
 
 
 def embed(text: str) -> list[float]:
-    """Real Titan V2 embedding (1024 dims) — used by both vector backends."""
+    """Real Titan V2 embedding (1024 dims), used by both vector backends."""
     client = _aws().client("bedrock-runtime", region_name=AWS_REGION)
     resp = client.invoke_model(
         modelId=EMBED_MODEL_ID,
@@ -131,7 +131,7 @@ class DynamoDBVectorStore:
     """Vector memory in a DynamoDB table with a native vector index.
 
     Vectors are stored as regular DynamoDB items (primary key + text + embedding
-    List attribute). Queries use the SearchVectors API — approximate nearest
+    List attribute). Queries use the SearchVectors API, approximate nearest
     neighbor at single-digit millisecond latency, serverless, on-demand billing.
 
     The key difference vs S3 Vectors: the vector index lives inside a DynamoDB
@@ -177,7 +177,7 @@ class DynamoDBVectorStore:
             self._wait_table_active()
             return
 
-        # Table exists — add the vector index if it's missing.
+        # Table exists, add the vector index if it's missing.
         existing = {vi["IndexName"] for vi in desc.get("VectorIndexes", [])}
         if self.index not in existing:
             self.client.update_table(
@@ -274,7 +274,7 @@ def make_store(partition: str):
 
 
 def timed(fn, *args, **kwargs):
-    """Run fn and return (result, elapsed_ms) — the demo measures, never guesses."""
+    """Run fn and return (result, elapsed_ms), the demo measures, never guesses."""
     start = time.perf_counter()
     result = fn(*args, **kwargs)
     return result, (time.perf_counter() - start) * 1000

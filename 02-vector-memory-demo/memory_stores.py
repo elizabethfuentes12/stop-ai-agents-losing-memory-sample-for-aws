@@ -1,4 +1,4 @@
-"""The four memory stores this demo compares — key-value, FAISS, Amazon S3 Vectors,
+"""The four memory stores this demo compares, key-value, FAISS, Amazon S3 Vectors,
 and Amazon DynamoDB Vector Search.
 
 The dividing line between Demo 01 and this demo:
@@ -8,7 +8,7 @@ The dividing line between Demo 01 and this demo:
     semantic search: embed once at write time, embed the question at query time,
     retrieve by cosine similarity. The stored text never needs to share words with the question.
 
-Three vector backends, same embeddings, same memories — so the measured difference
+Three vector backends, same embeddings, same memories, so the measured difference
 is the backend, not the data:
 
   - FAISS (in-process): the index lives in RAM during the process. Microsecond queries,
@@ -16,7 +16,7 @@ is the backend, not the data:
   - Amazon S3 Vectors (managed vector storage): dedicated vector bucket + index. Persists
     across restarts, reachable from any process with credentials. ~170-200 ms per query.
   - Amazon DynamoDB Vector Search (GA 2025): vector index added to a DynamoDB table.
-    The same table can hold your operational data alongside embeddings — no separate
+    The same table can hold your operational data alongside embeddings, no separate
     vector store to provision. Uses the SearchVectors API (added in boto3 1.43.72).
     Single-digit millisecond latency, fully serverless, on-demand billing only.
 
@@ -25,7 +25,7 @@ embedder for all vector backends. boto3 clients are built from an explicit profi
 (AWS_PROFILE or default chain) so stray env tokens can't hijack the session.
 
 Self-provisioning (series rule): every AWS resource the demo needs is created
-by the demo itself if it doesn't exist — no console steps.
+by the demo itself if it doesn't exist, no console steps.
 
 Requires boto3 >= 1.43.72 (SearchVectors was added in that release).
 """
@@ -63,7 +63,7 @@ def _aws():
 
 
 def embed(text: str) -> list[float]:
-    """Real Titan V2 embedding (1024 dims) — used by BOTH vector backends."""
+    """Real Titan V2 embedding (1024 dims), used by BOTH vector backends."""
     client = _aws().client("bedrock-runtime", region_name=AWS_REGION)
     resp = client.invoke_model(
         modelId=EMBED_MODEL_ID,
@@ -72,7 +72,7 @@ def embed(text: str) -> list[float]:
     return json.loads(resp["body"].read())["embedding"]
 
 
-# ── Store 1: key-value (Demo 01's memory — the baseline) ─────────────────────
+# ── Store 1: key-value (Demo 01's memory, the baseline) ─────────────────────
 class KeyValueStore:
     """Plain dict store: perfect when you know the key, blind to meaning."""
 
@@ -176,7 +176,7 @@ class DynamoDBVectorStore:
     """Vector memory in a DynamoDB table with a native vector index.
 
     Vectors are stored as regular DynamoDB items (primary key + text + embedding
-    List attribute). Queries use the SearchVectors API — approximate nearest neighbor
+    List attribute). Queries use the SearchVectors API, approximate nearest neighbor
     at single-digit millisecond latency, fully serverless, on-demand billing.
 
     The key difference vs S3 Vectors: the vector index lives inside an existing
@@ -223,7 +223,7 @@ class DynamoDBVectorStore:
             self._wait_table_active()
             return
 
-        # Table exists — add the vector index if it's missing.
+        # Table exists, add the vector index if it's missing.
         existing = {vi["IndexName"] for vi in desc.get("VectorIndexes", [])}
         if self.index not in existing:
             self.client.update_table(
@@ -312,7 +312,7 @@ class DynamoDBVectorStore:
 
 
 def timed(fn, *args, **kwargs):
-    """Run fn and return (result, elapsed_ms) — the demo measures, never guesses."""
+    """Run fn and return (result, elapsed_ms), the demo measures, never guesses."""
     start = time.perf_counter()
     result = fn(*args, **kwargs)
     return result, (time.perf_counter() - start) * 1000

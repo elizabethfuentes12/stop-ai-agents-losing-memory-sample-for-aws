@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — deploys the AgentMemoryVectorStoreStack for Demo 02.
+# deploy.sh, deploys the AgentMemoryVectorStoreStack for Demo 02.
 #
 # What it creates:
 #   - Amazon S3 Vectors bucket + traveler-memories index (Tests 3)
@@ -20,7 +20,7 @@ ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
 REGION=$(aws configure get region 2>/dev/null || echo "us-east-1")
 
 echo "=========================================="
-echo "  Demo 02 — Vector store deploy"
+echo "  Demo 02, Vector store deploy"
 echo "  Account : $ACCOUNT"
 echo "  Region  : $REGION"
 echo "=========================================="
@@ -36,7 +36,7 @@ else
   pip install -q -r requirements.txt
 fi
 
-# ── Build the boto3 layer (pure Python — no Docker needed) ───────────────────
+# ── Build the boto3 layer (pure Python, no Docker needed) ───────────────────
 # This layer overrides the Lambda runtime's boto3 to get SearchVectors (DynamoDB)
 # and the S3 Vectors APIs, both added in boto3>=1.43.72.
 echo "Building boto3>=1.43.72 Lambda layer..."
@@ -51,7 +51,7 @@ pip install botocore==1.43.72 s3transfer urllib3 jmespath python-dateutil six \
   --quiet
 echo "Layer built."
 
-# ── CDK bootstrap (idempotent — safe to run every time) ─────────────────────
+# ── CDK bootstrap (idempotent, safe to run every time) ─────────────────────
 cdk bootstrap "aws://$ACCOUNT/$REGION" --quiet
 
 # ── Deploy ───────────────────────────────────────────────────────────────────

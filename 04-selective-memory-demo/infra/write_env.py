@@ -33,4 +33,4 @@ for stack_outputs in outputs.values():
         set_env_key(env_file, "AGENTCORE_MEMORY_NAME", stack_outputs["AgentCoreMemoryName"])
         print(f"  AGENTCORE_MEMORY_NAME={stack_outputs['AgentCoreMemoryName']}")
 
-print(f"Done — {demo_root}/.env updated.")
+print(f"Done, {demo_root}/.env updated.")

@@ -47,9 +47,9 @@ ax.set_axisbelow(True)
 ax.spines[["top", "right"]].set_visible(False)
 
 legend_patches = [
-    mpatches.Patch(color=RED, label="Dump all — loads entire memory (inefficient)"),
-    mpatches.Patch(color=ORANGE, label="Keyword — exact match (missed relevant sections)"),
-    mpatches.Patch(color=GREEN, label="Semantic — top-3 relevant (accurate + efficient)"),
+    mpatches.Patch(color=RED, label="Dump all, loads entire memory (inefficient)"),
+    mpatches.Patch(color=ORANGE, label="Keyword, exact match (missed relevant sections)"),
+    mpatches.Patch(color=GREEN, label="Semantic, top-3 relevant (accurate + efficient)"),
 ]
 ax.legend(handles=legend_patches, loc="upper right", fontsize=10, framealpha=0.9)
 
@@ -64,7 +64,7 @@ ax.annotate(
 
 ax.text(
     0.5, -0.12,
-    'Query: "What food do I like?" — 8 memory sections (persona, travel, food, work, trips, loyalty, comms, emergency).',
+    'Query: "What food do I like?", 8 memory sections (persona, travel, food, work, trips, loyalty, comms, emergency).',
     transform=ax.transAxes, ha="center", fontsize=9, color="#666666",
 )
 

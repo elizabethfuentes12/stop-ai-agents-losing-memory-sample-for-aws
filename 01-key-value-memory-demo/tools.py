@@ -1,4 +1,4 @@
-"""Tools for the persistent-memory demo — real APIs, no hardcoded data.
+"""Tools for the persistent-memory demo, real APIs, no hardcoded data.
 
 A brand-new user arrives with EMPTY memory and searches flights. Two versions of
 the same tools demonstrate the difference between stateless (no memory) and
@@ -9,15 +9,15 @@ stateful (agent.state) designs:
     non-stop tolerance, carriers); the next search RANKS real offers by them.
 
 Data sources (both real, both verified live):
-  - Flights: Duffel sandbox API (flights_api.py) — real offers, real carriers.
-  - Climate: Open-Meteo historical archive (weather_api.py) — real monthly averages.
+  - Flights: Duffel sandbox API (flights_api.py), real offers, real carriers.
+  - Climate: Open-Meteo historical archive (weather_api.py), real monthly averages.
 
 Tool descriptions follow the research-backed pattern (ToolLLM/AgentTuning): the
 first sentence says WHEN to use the tool, trigger phrases are listed, parameters
 carry example values, and the return shape is documented. The system prompt does
-NOT re-describe the tools — the agent learns their purpose from this context.
+NOT re-describe the tools, the agent learns their purpose from this context.
 
-State store: agent.state — preferences persist across turns within a session;
+State store: agent.state, preferences persist across turns within a session;
 FileSessionManager persists them across restarts (Test 3).
 """
 
@@ -29,7 +29,7 @@ import flights_api
 import weather_api
 
 
-# ── Stateless tools (no memory — baseline) ──────────────────────────────────
+# ── Stateless tools (no memory, baseline) ──────────────────────────────────
 
 @tool
 def search_flights_stateless(origin: str, destination: str, departure_date: str,
@@ -73,7 +73,7 @@ def book_flight_stateless(offer_id: str) -> str:
                "currency": "USD", "route": "JFK-CDG"}
         Or an error string if the offer expired (search again for a fresh one).
     """
-    # Identical business logic to the stateful book_flight — retrieve the REAL chosen
+    # Identical business logic to the stateful book_flight, retrieve the REAL chosen
     # offer and confirm it. The ONLY difference is what comes after: this version has
     # no ToolContext, so nothing about the choice can be remembered.
     offer = flights_api.get_offer(offer_id)
@@ -213,7 +213,7 @@ def get_user_profile(tool_context: ToolContext) -> str:
     }, indent=1)
 
 
-# ── Shared (works with either version — climate is user-independent) ────────
+# ── Shared (works with either version, climate is user-independent) ────────
 
 @tool
 def best_time_to_visit(city: str) -> str:

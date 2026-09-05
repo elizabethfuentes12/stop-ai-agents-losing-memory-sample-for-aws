@@ -8,7 +8,7 @@ Based on research:
 - [MemoryOS of AI Agent](https://arxiv.org/abs/2506.06326) (Kang et al., 2025)
 - [Cognitive Memory in Large Language Models](https://arxiv.org/abs/2504.02441) (Shan et al., 2025)
 
-This demo implements memory patterns using [Strands Agents SDK](https://github.com/strands-agents/sdk-python). The patterns are framework-agnostic and carry over to other agent frameworks.
+This demo implements memory patterns using [Strands Agents SDK](https://github.com/strands-agents/sdk-python).
 
 ---
 

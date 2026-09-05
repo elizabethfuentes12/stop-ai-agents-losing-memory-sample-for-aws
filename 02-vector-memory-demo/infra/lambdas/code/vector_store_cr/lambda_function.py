@@ -1,13 +1,13 @@
-"""Custom Resource handler — S3 Vectors bucket+index and DynamoDB table+vector-index.
+"""Custom Resource handler, S3 Vectors bucket+index and DynamoDB table+vector-index.
 
 CloudFormation calls this Lambda on Create/Update/Delete.
 All three resources use APIs too new for native CloudFormation support (as of 2025),
 so we manage their lifecycle here using boto3>=1.43.72 (bundled as a Lambda layer).
 
 ResourceType field in Properties selects which resource to manage:
-  "S3VectorBucket"  — create/delete the vector bucket
-  "S3VectorIndex"   — create/delete one vector index inside the bucket
-  "DynamoDBVectorTable" — create/delete a DynamoDB table with a vector index
+  "S3VectorBucket" , create/delete the vector bucket
+  "S3VectorIndex"  , create/delete one vector index inside the bucket
+  "DynamoDBVectorTable", create/delete a DynamoDB table with a vector index
 """
 import json
 import threading

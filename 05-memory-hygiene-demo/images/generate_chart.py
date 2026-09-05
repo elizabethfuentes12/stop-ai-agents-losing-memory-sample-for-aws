@@ -3,7 +3,7 @@ Generate the blast-radius chart for the memory hygiene demo.
 
 Numbers come from test_memory_hygiene.py (measured on the live demo): how many of 4
 questions/lookups are contaminated by ONE poisoned item, per backend and per defense state.
-Deterministic checks against the store — no LLM judge, no invented numbers.
+Deterministic checks against the store, no LLM judge, no invented numbers.
 
 Run: uv run python generate_chart.py
 Output: memory-hygiene-blast-radius.png
@@ -20,7 +20,7 @@ BLUE = "#7EA6E0"     # cleaned (forget)
 TOTAL = 4
 states = ["Poisoned\n(no defense)", "Gated\n(write-gate)", "Cleaned\n(forget)"]
 
-# From test_memory_hygiene.py — contaminated answers of 4, per backend.
+# From test_memory_hygiene.py, contaminated answers of 4, per backend.
 kv_values = [1, 0, 0]      # key-value: poison is one blob → blast radius 1
 graph_values = [4, 0, 0]   # graph: poison propagates through every multi-hop traversal
 

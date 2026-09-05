@@ -1,20 +1,20 @@
 """
-Demo: Graph Memory — Reasoning Over Relationships, Not Just Similarity
+Demo: Graph Memory, Reasoning Over Relationships, Not Just Similarity
 
 Based on research in graph-structured agent memory:
-  - GAAMA: Graph Augmented Associative Memory for Agents (https://arxiv.org/abs/2603.27910) — 2026
-  - MAGMA: A Multi-Graph based Agentic Memory Architecture for AI Agents (https://arxiv.org/abs/2601.03236) — 2026
-  - GRAVITY: Architecture-Agnostic Structured Anchoring for Long-Horizon Conversational Memory (https://arxiv.org/abs/2605.01688) — 2026
+  - GAAMA: Graph Augmented Associative Memory for Agents (https://arxiv.org/abs/2603.27910), 2026
+  - MAGMA: A Multi-Graph based Agentic Memory Architecture for AI Agents (https://arxiv.org/abs/2601.03236), 2026
+  - GRAVITY: Architecture-Agnostic Structured Anchoring for Long-Horizon Conversational Memory (https://arxiv.org/abs/2605.01688), 2026
 
 Semantic memory (Demo 02) retrieves by *similarity* but cannot reason over
 *relationships*. A multi-hop question needs to find an entry point by similarity and
 then TRAVERSE the graph to the answer. This demo contrasts the two on the same graph:
 
-  Test 1: Semantic recall (before)    — pure vector similarity, misses the multi-hop chain
-  Test 2: Graph recall (after)        — vector similarity + graph traversal, recovers it
-  Test 3: Full Strands agent          — the agent uses graph memory to answer, and writes
+  Test 1: Semantic recall (before)   , pure vector similarity, misses the multi-hop chain
+  Test 2: Graph recall (after)       , vector similarity + graph traversal, recovers it
+  Test 3: Full Strands agent         , the agent uses graph memory to answer, and writes
                                         a new fact back into the graph (the harness)
-  Test 4: Deterministic scorecard     — 4 multi-hop questions, before vs after (feeds the chart)
+  Test 4: Deterministic scorecard    , 4 multi-hop questions, before vs after (feeds the chart)
 
 The graph is a KNOWN, seeded graph, so the before/after scores are reproducible.
 Both strategies receive the SAME facts; the graph wins because it stores them as
@@ -66,9 +66,9 @@ SCORECARD = [
 
 def run_test_1_semantic(driver, db, embedder):
     """Test 1: Agent with semantic-only recall. Vector similarity alone cannot answer
-    a multi-hop question — it surfaces related pieces but never connects them to a person."""
+    a multi-hop question, it surfaces related pieces but never connects them to a person."""
     print("\n" + "=" * 70)
-    print("TEST 1: AGENT WITH SEMANTIC RECALL — vector similarity only, no traversal")
+    print("TEST 1: AGENT WITH SEMANTIC RECALL, vector similarity only, no traversal")
     print("=" * 70)
 
     tt.init_memory(driver=driver, db=db, embedder=embedder)
@@ -88,7 +88,7 @@ def run_test_1_semantic(driver, db, embedder):
     recovered = "Maya Torres" in answer
     print(f"\n  Recovers the person (Maya Torres)? {recovered}")
     print("  Similarity surfaces Iberia / Madrid / Spain as separate pieces but cannot")
-    print("  connect them to a person — no notion of a relationship.")
+    print("  connect them to a person, no notion of a relationship.")
     return {"strategy": "semantic recall", "recovered": recovered}
 
 
@@ -96,7 +96,7 @@ def run_test_2_graph(driver, db, embedder):
     """Test 2: Agent with graph recall. Similarity finds an entry node, then Cypher
     traversal walks the relationships back to the person."""
     print("\n" + "=" * 70)
-    print("TEST 2: AGENT WITH GRAPH RECALL — vector similarity + graph traversal")
+    print("TEST 2: AGENT WITH GRAPH RECALL, vector similarity + graph traversal")
     print("=" * 70)
 
     tt.init_memory(driver=driver, db=db, embedder=embedder)
@@ -116,12 +116,12 @@ def run_test_2_graph(driver, db, embedder):
     recovered = "Maya Torres" in answer
     print(f"\n  Recovers the person (Maya Torres)? {recovered}")
     print("  Graph traversal walks Maya Torres -> Iberia -> Madrid -> Spain and returns")
-    print("  the person — the answer similarity alone could not reach.")
+    print("  the person, the answer similarity alone could not reach.")
     return {"strategy": "graph recall", "recovered": recovered}
 
 
 def run_test_3_agent(driver, db, embedder):
-    """Test 3: A full Strands agent that uses graph memory — and writes a new fact back."""
+    """Test 3: A full Strands agent that uses graph memory, and writes a new fact back."""
     print("\n" + "=" * 70)
     print("TEST 3: FULL STRANDS AGENT WITH GRAPH MEMORY")
     print("=" * 70)
@@ -142,8 +142,8 @@ def run_test_3_agent(driver, db, embedder):
     answer = resp.message["content"][0]["text"]
     print(f"  Agent: {answer.strip()[:220]}")
 
-    # Turn 2: teach the agent a new fact — it writes an edge into the graph.
-    teach = "By the way, remember that Maya Torres works at Iberia — she's my contact there."
+    # Turn 2: teach the agent a new fact, it writes an edge into the graph.
+    teach = "By the way, remember that Maya Torres works at Iberia, she's my contact there."
     print(f"\nTurn 2 (write): {teach}")
     resp = agent(teach)
     print(f"  Agent: {resp.message['content'][0]['text'].strip()[:220]}")
@@ -158,10 +158,10 @@ def run_test_3_agent(driver, db, embedder):
 
 
 def run_test_4_scorecard(driver, db, embedder):
-    """Test 4: Deterministic scorecard — semantic vs graph on 4 multi-hop questions.
+    """Test 4: Deterministic scorecard, semantic vs graph on 4 multi-hop questions.
     Uses retrievers directly (not agents) so scoring is deterministic and feeds the chart."""
     print("\n" + "=" * 70)
-    print("TEST 4: SCORECARD — semantic retrieval vs graph traversal, 4 multi-hop questions")
+    print("TEST 4: SCORECARD, semantic retrieval vs graph traversal, 4 multi-hop questions")
     print("=" * 70)
 
     semantic_retriever = gm.make_semantic_retriever(driver, db, embedder)
@@ -178,14 +178,14 @@ def run_test_4_scorecard(driver, db, embedder):
         print(f"  {question[:52]:<52} {'✓' if s else '✗':>9} {'✓' if g else '✗':>7}")
 
     total = len(SCORECARD)
-    print(f"\n  Correct answers recovered — semantic: {semantic_hits}/{total} | graph: {graph_hits}/{total}")
+    print(f"\n  Correct answers recovered, semantic: {semantic_hits}/{total} | graph: {graph_hits}/{total}")
     return {"total": total, "before_hits": semantic_hits, "after_hits": graph_hits}
 
 
 if __name__ == "__main__":
     print("=" * 70)
     print("  GRAPH MEMORY DEMO")
-    print("  Semantic recall vs graph traversal — same graph, one multi-hop question")
+    print("  Semantic recall vs graph traversal, same graph, one multi-hop question")
     print("=" * 70)
 
     driver, db, embedder = gm.build()
@@ -200,16 +200,16 @@ if __name__ == "__main__":
         print("=" * 70)
         print(f"\n  {'Test':<42} {'Recovers multi-hop answer?':>26}")
         print("  " + "-" * 68)
-        print(f"  {'Test 1 — Agent: semantic recall only':<42} {str(r1['recovered']):>26}")
-        print(f"  {'Test 2 — Agent: graph traversal':<42} {str(r2['recovered']):>26}")
-        print(f"  {'Test 3 — Agent: graph memory + write':<42} {str(r3['recovered']):>26}")
+        print(f"  {'Test 1, Agent: semantic recall only':<42} {str(r1['recovered']):>26}")
+        print(f"  {'Test 2, Agent: graph traversal':<42} {str(r2['recovered']):>26}")
+        print(f"  {'Test 3, Agent: graph memory + write':<42} {str(r3['recovered']):>26}")
         print(
             f"\n  Scorecard (Test 4): semantic {r4['before_hits']}/{r4['total']} correct, "
             f"graph {r4['after_hits']}/{r4['total']} correct."
         )
         print("\n  Key insight: similarity finds related pieces; only traversal connects them.")
         print("  Graph memory answers multi-hop questions that flat/semantic memory cannot.")
-        print("\n  Research: https://arxiv.org/abs/2601.03236 (MAGMA — multi-graph agentic memory)")
+        print("\n  Research: https://arxiv.org/abs/2601.03236 (MAGMA, multi-graph agentic memory)")
         print("  Strands:  https://github.com/strands-agents/sdk-python")
         print("  Neo4j:    https://neo4j.com/docs/neo4j-graphrag-python/")
     finally:

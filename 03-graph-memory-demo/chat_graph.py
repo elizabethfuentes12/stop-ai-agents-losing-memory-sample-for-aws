@@ -1,5 +1,5 @@
 """
-Interactive travel assistant — GRAPH MEMORY.
+Interactive travel assistant, GRAPH MEMORY.
 
 Memory is stored as a knowledge graph. The agent can traverse relationships
 between people, airlines, cities, and countries to answer multi-hop questions.
@@ -65,7 +65,7 @@ agent = Agent(
 )
 
 print("\n" + "=" * 60)
-print("  TRAVEL ASSISTANT — graph memory")
+print("  TRAVEL ASSISTANT, graph memory")
 print("  recall_graph · recall_semantic · remember_fact")
 print("  search_flights · book_flight · best_time_to_visit")
 print("=" * 60)
@@ -81,7 +81,7 @@ def _show_graph():
             f"RETURN a.name AS src, type(r) AS rel, b.name AS dst ORDER BY a.name"
         ).data()
 
-    print(f"\nGraph — {len(nodes)} nodes, {len(edges)} edges:")
+    print(f"\nGraph, {len(nodes)} nodes, {len(edges)} edges:")
     for e in edges:
         print(f"  ({e['src']}) -[{e['rel']}]-> ({e['dst']})")
     if not edges:

@@ -1,4 +1,4 @@
-"""Mechanism C — Amazon Bedrock AgentCore Memory: managed selective memory.
+"""Mechanism C, Amazon Bedrock AgentCore Memory: managed selective memory.
 
 The fully managed version of what this demo builds by hand: you send RAW
 conversation turns (create_event) and AgentCore's built-in strategies decide
@@ -11,15 +11,15 @@ what is worth keeping, extract it, embed it, and index it per memory type:
   | tripSummary                  | SUMMARIZATION   | rolling session summary      |
   | episodes                     | EPISODIC        | event episodes (reflection)  |
 
-Extraction is asynchronous — records become retrievable seconds after the
+Extraction is asynchronous, records become retrievable seconds after the
 event is written (measured ~1 min in this demo; the tests poll and report the
 real number, because AWS publishes none).
 
 Self-provisioning (series rule): ensure_memory() creates the memory with all
 four strategies if it doesn't exist. Real API facts verified live 2026-07-16:
-  - episodicMemoryStrategy REQUIRES reflectionConfiguration.namespaces —
+  - episodicMemoryStrategy REQUIRES reflectionConfiguration.namespaces -
     a bare {'name': ...} fails with a blank ValidationException.
-  - DeleteMemory fails while status is CREATING — wait for ACTIVE first.
+  - DeleteMemory fails while status is CREATING, wait for ACTIVE first.
   - create_event payload = [{'conversational': {'content': {'text': ...},
     'role': 'USER'|'ASSISTANT'}}]; retrieval namespace =
     /strategies/{strategyId}/actors/{actorId}/ (session-scoped for
@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 
 import boto3
 
-MEMORY_NAME = os.getenv("AGENTCORE_MEMORY_NAME", "SelectiveMemoryDemo")
+MEMORY_NAME = os.getenv("AGENTCORE_MEMORY_NAME", "SelectiveMemoryDemoV2")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 _session = None
@@ -68,18 +68,29 @@ def ensure_memory() -> dict:
     if memory is None:
         resp = ctrl.create_memory(
             name=MEMORY_NAME,
-            description="Selective-memory demo — the 4 built-in strategies",
+            description="Selective-memory demo, the 4 built-in strategies",
             eventExpiryDuration=7,
             memoryStrategies=[
-                {"semanticMemoryStrategy": {"name": "facts"}},
-                {"userPreferenceMemoryStrategy": {"name": "preferences"}},
-                {"summaryMemoryStrategy": {"name": "tripSummary"}},
+                # Each strategy declares the SAME namespace you reference later in
+                # RetrievalConfig (official Strands integration pattern). Without
+                # explicit namespaces, retrieval can't scope by strategy.
+                {"semanticMemoryStrategy": {
+                    "name": "facts",
+                    "namespaces": ["/facts/{actorId}/"]}},
+                {"userPreferenceMemoryStrategy": {
+                    "name": "preferences",
+                    "namespaces": ["/preferences/{actorId}/"]}},
+                {"summaryMemoryStrategy": {
+                    "name": "tripSummary",
+                    "namespaces": ["/summaries/{actorId}/{sessionId}/"]}},
                 {"episodicMemoryStrategy": {
                     "name": "episodes",
-                    # Required in practice (verified live): a bare episodic
-                    # strategy fails validation without reflection namespaces.
+                    "namespaces": ["/episodes/{actorId}/{sessionId}/"],
+                    # Reflection namespace must be a hierarchical prefix of the
+                    # episodic namespace (verified live: CreateMemory rejects
+                    # otherwise). Keep it under the same /episodes/ root.
                     "reflectionConfiguration": {
-                        "namespaces": ["/strategies/{memoryStrategyId}/actors/{actorId}"]},
+                        "namespaces": ["/episodes/{actorId}/{sessionId}/"]},
                 }},
             ],
         )
@@ -123,13 +134,40 @@ def retrieve(memory_id: str, strategy_id: str, actor_id: str, query: str,
     return [r.get("content", {}).get("text", "") for r in resp.get("memoryRecordSummaries", [])]
 
 
+# Region alias for the official Strands session-manager integration.
+REGION = AWS_REGION
+
+
+def retrieve_by_namespace(memory_id: str, namespace: str, query: str,
+                          top_k: int = 10, min_score: float = 0.0) -> list[str]:
+    """Retrieve extracted records under a canonical strategy namespace
+    (e.g. /facts/{actorId}/), keeping only records at or above min_score.
+
+    This mirrors what the official AgentCoreMemorySessionManager does at recall
+    time via RetrievalConfig.relevance_score: the API returns records ordered by
+    relevance, and we drop the weakly-related ones instead of dumping everything.
+    """
+    resp = data().retrieve_memory_records(
+        memoryId=memory_id, namespace=namespace,
+        searchCriteria={"searchQuery": query}, maxResults=top_k,
+    )
+    out = []
+    for r in resp.get("memoryRecordSummaries", []):
+        score = r.get("score")
+        if score is not None and score < min_score:
+            continue
+        out.append(r.get("content", {}).get("text", ""))
+    return out
+
+
 def wait_for_extraction(memory_id: str, strategy_id: str, actor_id: str, query: str,
                         expect_min: int = 1, timeout_s: int = 300) -> float | None:
-    """Poll until at least expect_min records are retrievable; return the lag in
-    seconds (the number AWS doesn't publish), or None on timeout."""
+    """Poll until at least expect_min records are retrievable under the facts
+    namespace; return the lag in seconds (the number AWS doesn't publish), or None."""
     start = time.time()
+    namespace = f"/facts/{actor_id}/"
     while time.time() - start < timeout_s:
-        if len(retrieve(memory_id, strategy_id, actor_id, query)) >= expect_min:
+        if len(retrieve_by_namespace(memory_id, namespace, query, top_k=5)) >= expect_min:
             return time.time() - start
         threading.Event().wait(10)
     return None

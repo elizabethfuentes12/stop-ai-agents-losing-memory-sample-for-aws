@@ -30,4 +30,4 @@ for stack_outputs in outputs.values():
         set_env_key(env_file, "SESSIONS_BUCKET", stack_outputs["SessionsBucketName"])
         print(f"  {env_file}: SESSIONS_BUCKET={stack_outputs['SessionsBucketName']}")
 
-print("Done — .env updated.")
+print("Done, .env updated.")

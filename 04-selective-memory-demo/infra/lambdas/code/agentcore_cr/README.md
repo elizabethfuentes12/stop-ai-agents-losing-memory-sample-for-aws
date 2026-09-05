@@ -29,8 +29,8 @@ Invoked by the `AgentCoreStack` during `cdk deploy` and `cdk destroy`.
 - `bedrock-agentcore-control:CreateMemory`, `GetMemory`, `ListMemories`, `DeleteMemory`
 
 ## Layers / dependencies
-boto3-layer (boto3>=1.43.72) — required for S3 Vectors and AgentCore APIs.
+boto3-layer (boto3>=1.43.72), required for S3 Vectors and AgentCore APIs.
 
 ## Timeout
-9 minutes — AgentCore Memory creation is asynchronous and can take several minutes
+9 minutes, AgentCore Memory creation is asynchronous and can take several minutes
 to become ACTIVE. The Lambda polls until ACTIVE or timeout.

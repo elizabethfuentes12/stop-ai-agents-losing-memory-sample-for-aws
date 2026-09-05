@@ -6,7 +6,7 @@ from custom_resources import AgentCoreResources
 
 
 class AgentCoreStack(Stack):
-    """Stack for Demo 04 — AgentCore Memory (4 strategies) + S3 Vectors extractor indexes.
+    """Stack for Demo 04, AgentCore Memory (4 strategies) + S3 Vectors extractor indexes.
 
     Both services use Lambda-backed Custom Resources (no native CloudFormation support).
     The Lambda bundles boto3>=1.43.72 via a pre-built layer.
@@ -23,7 +23,7 @@ class AgentCoreStack(Stack):
             code=lambda_.Code.from_asset("layers/boto3-layer"),
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[lambda_.Architecture.ARM_64],
-            description="boto3>=1.43.72 — S3 Vectors and AgentCore Memory APIs",
+            description="boto3>=1.43.72, S3 Vectors and AgentCore Memory APIs",
         )
 
         lambdas = AgentCoreLambdas(self, "Lambdas", boto3_layer=boto3_layer)
@@ -31,7 +31,7 @@ class AgentCoreStack(Stack):
         resources = AgentCoreResources(
             self, "AgentCore",
             cr_handler=lambdas.cr_handler,
-            # No account ID hardcoded — CDK Fn.sub resolves ${AWS::AccountId} at deploy time.
+            # No account ID hardcoded, CDK Fn.sub resolves ${AWS::AccountId} at deploy time.
             vector_bucket_name=cdk.Fn.sub("agent-memory-demo-vectors-${AWS::AccountId}"),
             memory_name="SelectiveMemoryDemo",
             embed_dims=1024,

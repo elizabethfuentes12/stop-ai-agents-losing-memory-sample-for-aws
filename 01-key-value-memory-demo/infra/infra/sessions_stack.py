@@ -5,7 +5,7 @@ from buckets import SessionsBucket
 
 
 class SessionsStack(Stack):
-    """Stack for Demo 01 — creates the S3 bucket used by S3SessionManager (Test 4).
+    """Stack for Demo 01, creates the S3 bucket used by S3SessionManager (Test 4).
 
     Account ID is resolved at deploy time from the current credentials.
     Run deploy.sh to deploy; the bucket name is written to ../.env automatically.

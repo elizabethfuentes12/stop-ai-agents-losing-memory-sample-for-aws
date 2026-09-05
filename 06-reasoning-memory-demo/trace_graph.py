@@ -1,4 +1,4 @@
-"""Decision traces over a graph store (Neo4j) — provenance you can traverse.
+"""Decision traces over a graph store (Neo4j), provenance you can traverse.
 
 This is the graph counterpart to trace_kv.py. It stores the SAME decision traces, but as
 connected nodes instead of flat blobs:
@@ -9,7 +9,7 @@ connected nodes instead of flat blobs:
     (:Evidence)-[:FROM_SOURCE]->(:Source)                   external origin of the evidence
 
 Both stores answer "why did I decide X?" fine. The question that separates them is the
-REVERSE audit: "evidence source S turned out to be false — which of my decisions depended
+REVERSE audit: "evidence source S turned out to be false, which of my decisions depended
 on it?" In the flat store that is a linear scan of each trace's own blob, so it only finds
 decisions that cite S *directly*. In the graph it is one traversal:
 
@@ -22,7 +22,7 @@ follows provenance through decisions that depended on S only via *other decision
 outputs*, at any depth.
 
 Uses an isolated database (default ``reasoningdemo``) created in Cypher 25, matching
-demos 03 and 05 — this demo's replay/audit queries are plain Cypher (no vector index
+demos 03 and 05, this demo's replay/audit queries are plain Cypher (no vector index
 needed), but a consistent database language means Demo 03's vector retrievers can be
 pointed at this graph later without surprises. Never touches other databases.
 """
@@ -64,7 +64,7 @@ def ensure_database(driver) -> str:
     """Create the demo's isolated database (Cypher 25 where supported); return its name.
 
     Same approach as demos 03 and 05: atomic ``CREATE DATABASE ... DEFAULT LANGUAGE
-    CYPHER 25`` on servers that support it — no ``neo4j.conf`` edit, no restart. Falls
+    CYPHER 25`` on servers that support it, no ``neo4j.conf`` edit, no restart. Falls
     back to the default database on Neo4j Community.
     """
     if not _valid_identifier(NEO4J_DATABASE):
@@ -131,7 +131,7 @@ def write_trace(driver, db: str, trace: dict) -> None:
     """Store one decision trace as a node chain with evidence provenance.
 
     Every evidence record's ``source`` either names an external :Source (origin) or
-    another :Evidence record (derivation) — the same field the flat store keeps, but
+    another :Evidence record (derivation), the same field the flat store keeps, but
     here it becomes a traversable edge instead of a string inside a blob.
     """
     with driver.session(database=db) as session:
@@ -192,13 +192,13 @@ def seed_graph(driver, db: str) -> dict:
     return dict(counts)
 
 
-# ── The queries (deterministic — plain Cypher, no LLM judge) ─────────────────
+# ── The queries (deterministic, plain Cypher, no LLM judge) ─────────────────
 def replay_why_graph(driver, db: str, topic: str) -> dict | None:
     """Answer "why did I decide X?" by walking the decision's step chain.
 
     Several decisions may mention the topic (a budget that includes the flight, the
     decision that chose it, ...). Rank matches by where the topic first appears in the
-    outcome — the decision *about* X mentions it earliest — so the pick is deterministic.
+    outcome, the decision *about* X mentions it earliest, so the pick is deterministic.
     """
     with driver.session(database=db) as session:
         row = session.run(
@@ -221,7 +221,7 @@ def replay_why_graph(driver, db: str, topic: str) -> dict | None:
 
 def find_affected_decisions_graph(driver, db: str, source_name: str = COMPROMISED_SOURCE) -> list:
     """The reverse audit as ONE traversal: every decision whose evidence chain reaches
-    the compromised source — directly or through any depth of derived evidence.
+    the compromised source, directly or through any depth of derived evidence.
 
     ``DERIVED_FROM*0..`` is the part a flat scan cannot express: length 0 covers
     evidence taken straight from the source, and longer paths follow provenance through

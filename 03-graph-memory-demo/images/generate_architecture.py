@@ -2,7 +2,7 @@
 Architecture diagram for the graph memory demo.
 
 Shows the two retrieval paths an agent can take with the same Neo4j graph:
-  - recall_semantic: finds related nodes by similarity — pieces, no connections
+  - recall_semantic: finds related nodes by similarity, pieces, no connections
   - recall_graph: similarity to entry node → Cypher traversal → full chain back to person
 
 Run: uv run python generate_architecture.py
@@ -55,7 +55,7 @@ ax.axis("off")
 # ── Title ────────────────────────────────────────────────────────────────────
 ax.text(7, 6.65, "Graph Memory for AI Agents", ha="center", va="center",
         fontsize=17, fontweight="bold", color=NAVY)
-ax.text(7, 6.3, "Same graph, two retrieval strategies — only traversal connects the pieces",
+ax.text(7, 6.3, "Same graph, two retrieval strategies, only traversal connects the pieces",
         ha="center", va="center", fontsize=11, color=GRAY)
 
 # ── User Question ─────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
 
 Research-backed techniques to stop AI agents from losing memory: key-value state for preference retention, vector memory for semantic retrieval, graph memory for multi-hop reasoning, selective memory for deciding what to keep, memory hygiene against poisoning, and decision traces for auditability.
 
-These demos use Strands Agents for implementation. The memory patterns demonstrated are framework-agnostic and carry over to other agent frameworks.
+These demos use Strands Agents for implementation.
 
 ---
 
@@ -15,24 +15,24 @@ These demos use Strands Agents for implementation. The memory patterns demonstra
 
 | Demo | Description | Stack |
 |------|-------------|-------|
-| [01 - Key-Value Memory](01-key-value-memory-demo/) | Stop your agent from forgetting user preferences: the same 3-turn conversation climbing the durability ladder — no memory → `agent.state` → local disk → Amazon S3. Real flight data (Duffel); the only variable is where memory lives. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-agent.state-blue) |
-| [02 - Vector Memory](02-vector-memory-demo/) | Do you need a vector database for agent memory? FAISS (<0.1 ms) vs Amazon S3 Vectors (managed, ~200 ms, survives restarts) vs Amazon DynamoDB Vector Search (single-digit ms, vectors inside your existing table) — same Titan embeddings, measured. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![AWS](https://img.shields.io/badge/AWS-DynamoDB-orange) ![Strands](https://img.shields.io/badge/Strands-memory-blue) |
+| [01 - Key-Value Memory](01-key-value-memory-demo/) | Stop your agent from forgetting user preferences: the same 3-turn conversation climbing the durability ladder, no memory → `agent.state` → local disk → Amazon S3. Real flight data (Duffel); the only variable is where memory lives. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-agent.state-blue) |
+| [02 - Vector Memory](02-vector-memory-demo/) | Do you need a vector database for agent memory? FAISS (<0.1 ms) vs Amazon S3 Vectors (managed, ~200 ms, survives restarts) vs Amazon DynamoDB Vector Search (single-digit ms, vectors inside your existing table), same Titan embeddings, measured. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![AWS](https://img.shields.io/badge/AWS-DynamoDB-orange) ![Strands](https://img.shields.io/badge/Strands-memory-blue) |
 | [03 - Graph Memory](03-graph-memory-demo/) | Vector memory can't reason over relationships. Store memories as a Neo4j knowledge graph and traverse it to answer multi-hop questions: before 1/4, after 4/4. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-tools+state-blue) |
-| [04 - Selective Memory](04-selective-memory-demo/) | What should your agent actually remember? Three selection mechanisms measured: agent tools (inline), your own 4-prompt extractor to S3 Vectors, and AgentCore's built-in strategies — keep/discard quality, turn overhead, and the ~53-85 s managed extraction lag nobody publishes. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-core_memory-blue) |
+| [04 - Selective Memory](04-selective-memory-demo/) | What to store and what to throw away. The winning agent keeps the right things and drops the rest. Three selection mechanisms measured against the same conversation: one prompt you own, four typed stores, and Amazon Bedrock AgentCore Memory (managed), scored on selection recall and who controls the keep/throw-away policy. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-core_memory-blue) |
 | [05 - Memory Hygiene](05-memory-hygiene-demo/) | What an agent should NOT remember. A write-gate blocks poisoned/injected content; forget removes it. One poisoned fact contaminates 1 answer in key-value memory but 4/4 in a graph. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-write_gate-blue) |
 | [06 - Reasoning Memory](06-reasoning-memory-demo/) | Remember WHY the agent decided, not just what it knows. A HookProvider records decision traces automatically; the reverse audit finds 2/4 affected decisions with a flat scan vs 4/4 with a graph traversal. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-provenance-blue) ![Strands](https://img.shields.io/badge/Strands-hooks-blue) |
 | 07 - Hybrid Memory | *In design.* Two memories, one agent: vector + graph combined (GAAMA pattern), with S3 Vectors-built-by-hand vs AgentCore-managed at full parity. | ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![AgentCore](https://img.shields.io/badge/Bedrock-AgentCore_Memory-orange) ![Neo4j](https://img.shields.io/badge/Neo4j-graph-blue) |
-| 08 - Production Deploy | *Pending.* One deploy per memory type — pick the memory the use case needs, don't ship a monolithic all-in-one stack. | — |
+| 08 - Production Deploy | *Pending.* One deploy per memory type, pick the memory the use case needs, don't ship a monolithic all-in-one stack. |, |
 
 ---
 
 ## How Each Demo Works
 
-### Demo 01: Key-Value Memory (Agent State) — Stop Your Agent from Forgetting
+### Demo 01: Key-Value Memory (Agent State), Stop Your Agent from Forgetting
 
-**Research:** [MemoryOS of AI Agent](https://arxiv.org/abs/2506.06326) (Kang et al., 2025) — +49% F1 (accuracy metric), +46% BLEU-1 (text quality metric) with hierarchical memory
+**Research:** [MemoryOS of AI Agent](https://arxiv.org/abs/2506.06326) (Kang et al., 2025), +49% F1 (accuracy metric), +46% BLEU-1 (text quality metric) with hierarchical memory
 
-Without `agent.state`, the agent has no mechanism to learn from user actions: tools return results but never store preferences, so the only "memory" is the conversation transcript. Within a session the transcript papers over it — but nothing structured is learned, and one restart (every new process or request in production) erases everything. A user books a business-class flight, the process restarts, and "based on what you know about me" gets a generic answer.
+Without `agent.state`, the agent has no mechanism to learn from user actions: tools return results but never store preferences, so the only "memory" is the conversation transcript. Within a session the transcript papers over it, but nothing structured is learned, and one restart (every new process or request in production) erases everything. A user books a business-class flight, the process restarts, and "based on what you know about me" gets a generic answer.
 
 | Test | Approach | Structured profile | Cross-session |
 |------|----------|--------------------|---------------|
@@ -52,15 +52,15 @@ def book_flight(offer_id: str, tool_context: ToolContext) -> str:
 
 ---
 
-### Demo 02: Vector Memory — FAISS vs Amazon S3 Vectors
+### Demo 02: Vector Memory, FAISS vs Amazon S3 Vectors
 
 **Research:** [Zep: Temporal Knowledge Graph](https://arxiv.org/abs/2501.13956) (Rasmussen et al., 2025) · [Amazon S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) · [Bedrock AgentCore Memory](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/built-in-strategies.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el)
 
-The traveler asks *"what should I avoid eating on this trip?"* — the answer is stored under `dietary_notes`, but the question names no key and shares no words with the note. Key-value memory misses; vector memory retrieves by meaning. Then the real decision: which vector backend fits your deployment? Same Titan V2 embeddings, same memories, measured:
+The traveler asks *"what should I avoid eating on this trip?"*, the answer is stored under `dietary_notes`, but the question names no key and shares no words with the note. Key-value memory misses; vector memory retrieves by meaning. Then the real decision: which vector backend fits your deployment? Same Titan V2 embeddings, same memories, measured:
 
 | Store | Finds the answer | Query latency | Survives restart |
 |-------|------------------|---------------|------------------|
-| Key-value (keyword scan) | No | — | with a session manager |
+| Key-value (keyword scan) | No |, | with a session manager |
 | FAISS (in-process) | Yes | <0.1 ms | No |
 | Amazon S3 Vectors (managed) | Yes | ~170-200 ms | Yes (verified) |
 | Amazon DynamoDB Vector Search | Yes | single-digit ms | Yes (verified) |
@@ -71,11 +71,11 @@ The honest footnote: embedding the question (~0.5 s with Titan V2) dominates and
 |---------|-----------------|-------|
 | **FAISS** (in-process) | You build and hold the index in memory | Manual, per-process |
 | **Amazon S3 Vectors** | Managed storage: you create the bucket + index and call `put_vectors` / `query_vectors` | One index per tenant / memory type |
-| **Amazon DynamoDB Vector Search** | Vector index inside your existing DynamoDB table — one service, one billing model | Collocated with operational data |
+| **Amazon DynamoDB Vector Search** | Vector index inside your existing DynamoDB table, one service, one billing model | Collocated with operational data |
 
 ---
 
-### Demo 03: Graph Memory — Reasoning Over Relationships
+### Demo 03: Graph Memory, Reasoning Over Relationships
 
 **Research:** [MAGMA: A Multi-Graph based Agentic Memory Architecture for AI Agents](https://arxiv.org/abs/2601.03236) (Jiang et al., 2026)
 
@@ -96,19 +96,19 @@ agent = Agent(
 
 ---
 
-### Demo 04: Selective Memory — 3 Ways to Decide What to Remember
+### Demo 04: Selective Memory, What to Store and What to Throw Away
 
-**Research:** [MIRIX: Multi-Agent Memory System](https://arxiv.org/abs/2507.07957) (Wang & Chen, 2025) — 6 memory types, +35% accuracy, state-of-the-art (SOTA) 85.4% on LOCOMO
+**Research:** [MIRIX: Multi-Agent Memory System](https://arxiv.org/abs/2507.07957) (Wang & Chen, 2025), 6 memory types, +35% accuracy, state-of-the-art (SOTA) 85.4% on LOCOMO
 
-A planted conversation carries 5 items worth keeping (facts, preferences, an episode) and 3 decoys (small talk, a passing opinion, ephemeral weather). Three selection mechanisms, same input, deterministic scoring:
+A planted conversation carries 5 items worth keeping (facts, preferences, an episode) and 3 decoys (small talk, a passing opinion, ephemeral weather). All three run on Strands' native `MemoryManager`; what changes is who writes the keep/throw-away policy. Deterministic scoring, real runs (gpt-4o-mini, your numbers will vary):
 
-| Mechanism | Kept | Decoys leaked | Turn overhead | Available after |
-|-----------|------|---------------|---------------|-----------------|
-| A — agent tools (inline, `agent.state`) | 4/5 | 0 | ~1.5-2.5 s/turn | immediately |
-| B — own 4-prompt extractor → S3 Vectors | **5/5** | 0 | 0 (off-path) | ~4 s/turn |
-| C — AgentCore built-in strategies | 5/5* | 0-2* | ~0.4 s/turn | **~53-85 s (measured)** |
+| Mechanism | Selection recall | Who owns the policy | When queryable |
+|-----------|:---------------:|---------------------|----------------|
+| A: native, one store | ~3.9/5 | you (one prompt) | when the turn returns |
+| B: native, four typed stores | **~5/5** | you (one prompt per type) | when the turn returns |
+| C: Amazon Bedrock AgentCore Memory | **5/5** | AWS (managed, or custom-strategy override) | ~20-55 s later (async) |
 
-\* C is nondeterministic run to run — its criteria aren't yours to tune; that's the trade-off. B is "AgentCore built by hand": same pipeline, same per-type partitioning, but you own the prompts.
+All three recall the keepers well; the difference is **how much of the selection policy you hold**. A and B put the prompt in your hands (one, or one per type); C hands the whole pipeline to AWS, with [custom strategies](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/long-term-configuring-custom-strategies.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) available if you want to shape it. B reproduces AgentCore's per-type partitioning with the native SDK, so the built-in criteria become text you own.
 
 | Memory type | What it holds | AgentCore strategy equivalent |
 |-------------|---------------|-------------------------------|
@@ -119,7 +119,7 @@ A planted conversation carries 5 items worth keeping (facts, preferences, an epi
 
 ---
 
-### Demo 05: Memory Hygiene — What an Agent Should NOT Remember
+### Demo 05: Memory Hygiene, What an Agent Should NOT Remember
 
 **Research:** [AgentPoison](https://arxiv.org/abs/2407.12784) (2024) · [PoisonedRAG](https://arxiv.org/abs/2402.07867) (USENIX Security 2025)
 
@@ -130,20 +130,20 @@ Poisoned or injected content that reaches long-term memory persists across sessi
 | Key-value (`agent.state`) | 1/4 | 0/4 | 0/4 |
 | Graph (Neo4j) | 4/4 | 0/4 | 0/4 |
 
-One poisoned fact contaminates every multi-hop answer that traverses it — so graph memory is more powerful *and* more sensitive to poisoning.
+One poisoned fact contaminates every multi-hop answer that traverses it, so graph memory is more powerful *and* more sensitive to poisoning.
 
 ---
 
-### Demo 06: Reasoning Memory — Remember WHY You Decided
+### Demo 06: Reasoning Memory, Remember WHY You Decided
 
-**Research:** [MemWeaver](https://arxiv.org/abs/2601.18204) (2026) · [Less Context, More Accuracy (the Engram system)](https://arxiv.org/abs/2606.09900) (2026, preprint) — the traceability/provenance theme. *"Reasoning memory" itself is an engineering pattern, not an established academic category.*
+**Research:** [MemWeaver](https://arxiv.org/abs/2601.18204) (2026) · [Less Context, More Accuracy (the Engram system)](https://arxiv.org/abs/2606.09900) (2026, preprint), the traceability/provenance theme. *"Reasoning memory" itself is an engineering pattern, not an established academic category.*
 
-Agent memory stores *what* the agent knows — not *why it decided*. A `DecisionTraceRecorder` (a Strands `HookProvider`) captures each decision's question → tool steps → evidence → outcome automatically, with **zero changes to the tools**. Both a flat store and a graph replay "why did you recommend X?"; the graph also answers the **reverse audit**:
+Agent memory stores *what* the agent knows, not *why it decided*. A `DecisionTraceRecorder` (a Strands `HookProvider`) captures each decision's question → tool steps → evidence → outcome automatically, with **zero changes to the tools**. Both a flat store and a graph replay "why did you recommend X?"; the graph also answers the **reverse audit**:
 
-| Store | "Why did I decide X?" | "Source S was wrong — which decisions relied on it?" |
+| Store | "Why did I decide X?" | "Source S was wrong, which decisions relied on it?" |
 |-------|-----------------------|------------------------------------------------------|
-| Key-value (flat scan) | ✅ | 2/4 — direct citations only |
-| Graph (Neo4j traversal) | ✅ | 4/4 — follows provenance at any depth, with receipts |
+| Key-value (flat scan) | ✅ | 2/4, direct citations only |
+| Graph (Neo4j traversal) | ✅ | 4/4, follows provenance at any depth, with receipts |
 
 ```python
 agent = Agent(
@@ -164,7 +164,7 @@ export OPENAI_API_KEY="your-key"
 uv run python test_key_value_memory.py
 ```
 
-You can use different AI model providers (like Amazon Bedrock or Anthropic Claude) instead of OpenAI. See [supported model providers](https://strandsagents.com/docs/user-guide/concepts/model-providers/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) for details — each demo's README shows the one-line model swap.
+You can use different AI model providers (like Amazon Bedrock or Anthropic Claude) instead of OpenAI. See [supported model providers](https://strandsagents.com/docs/user-guide/concepts/model-providers/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) for details, each demo's README shows the one-line model swap.
 
 ---
 

@@ -5,7 +5,7 @@ from constructs import Construct
 class VectorStoreLambdas(Construct):
     """Custom Resource handler Lambda for S3 Vectors and DynamoDB Vector APIs.
 
-    boto3>=1.43.72 is bundled as a layer — those APIs aren't in older runtime versions.
+    boto3>=1.43.72 is bundled as a layer, those APIs aren't in older runtime versions.
     """
 
     def __init__(self, scope: Construct, construct_id: str,

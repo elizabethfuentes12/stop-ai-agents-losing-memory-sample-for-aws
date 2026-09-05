@@ -36,4 +36,4 @@ for stack_outputs in outputs.values():
         set_env_key(env_file, "DYNAMODB_TABLE", stack_outputs["DynamoDBTableName"])
         print(f"  DYNAMODB_TABLE={stack_outputs['DynamoDBTableName']}")
 
-print(f"Done — {demo_root}/.env updated.")
+print(f"Done, {demo_root}/.env updated.")

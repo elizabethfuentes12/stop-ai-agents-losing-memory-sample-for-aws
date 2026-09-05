@@ -54,7 +54,7 @@ ax.axis("off")
 # ── Title ─────────────────────────────────────────────────────────────────────
 ax.text(7.0, 6.65, "Memory Hygiene: Write-Gate Stops Poison at the Source",
         ha="center", fontsize=16, fontweight="bold", color=NAVY)
-ax.text(7.0, 6.3, "Screen at write time — then forget what already got in",
+ax.text(7.0, 6.3, "Screen at write time, then forget what already got in",
         ha="center", fontsize=10.5, color=GRAY)
 
 # ── Inputs ────────────────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ blocked = FancyBboxPatch((4.0, 0.95), 2.6, 0.65,
                           boxstyle="round,pad=0.02", linewidth=1.5,
                           facecolor="#FEE2E2", edgecolor=RED, zorder=4)
 ax.add_patch(blocked)
-ax.text(5.3, 1.27, "✗  BLOCKED — not written to memory", ha="center",
+ax.text(5.3, 1.27, "✗  BLOCKED, not written to memory", ha="center",
         fontsize=9.5, color=RED, fontweight="bold", zorder=5)
 
 # ── ALLOWED path ──────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ blast_kv = FancyBboxPatch((8.05, 4.0), 2.3, 0.72,
 ax.add_patch(blast_kv)
 ax.text(9.2, 4.52, "Blast radius if poisoned:", ha="center",
         fontsize=8.5, color=SLATE, zorder=5)
-ax.text(9.2, 4.18, "1/4 — one blob, one key", ha="center",
+ax.text(9.2, 4.18, "1/4, one blob, one key", ha="center",
         fontsize=9, color=SLATE, fontweight="bold", zorder=5)
 
 # ── Graph Store ───────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ blast_graph = FancyBboxPatch((8.05, 2.05), 2.3, 0.72,
 ax.add_patch(blast_graph)
 ax.text(9.2, 2.57, "Blast radius if poisoned:", ha="center",
         fontsize=8.5, color=SLATE, zorder=5)
-ax.text(9.2, 2.23, "4/4 — propagates via edges", ha="center",
+ax.text(9.2, 2.23, "4/4, propagates via edges", ha="center",
         fontsize=9, color=TEAL, fontweight="bold", zorder=5)
 
 # ── Forget path ───────────────────────────────────────────────────────────────

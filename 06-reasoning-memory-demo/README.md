@@ -12,7 +12,7 @@ Related research (traceability/provenance theme):
 - [MemWeaver: Weaving Hybrid Memories for Traceable Long-Horizon Agentic Reasoning](https://arxiv.org/abs/2601.18204) (Jan 2026)
 - [Less Context, More Accuracy: A Bi-Temporal Memory Engine for LLM Agents](https://arxiv.org/abs/2606.09900): the **Engram** system, Jun 2026; every stored fact keeps provenance and a supersession chain. Single-author preprint, cited for the design idea, not as peer-reviewed evidence.
 
-This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) for the graph track. The patterns are framework-agnostic and carry over to other agent frameworks.
+This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) for the graph track.
 
 > **Official integration.** The graph track wires Neo4j by hand on purpose, to keep the bespoke provenance schema and reverse-audit traversal (`DERIVED_FROM*0..`) visible. For plain graph memory in production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/) (a `Neo4jSessionManager` for `Agent(session_manager=...)`). It is a Neo4j Labs package (community-supported), not part of the Strands SDK core.
 

@@ -55,7 +55,7 @@ ax.axis("off")
 # ── Title ─────────────────────────────────────────────────────────────────────
 ax.text(7.5, 7.15, "Reasoning Memory: Remember WHY the Agent Decided",
         ha="center", fontsize=16, fontweight="bold", color=NAVY)
-ax.text(7.5, 6.8, "HookProvider captures decision traces automatically — zero changes to tools",
+ax.text(7.5, 6.8, "HookProvider captures decision traces automatically, zero changes to tools",
         ha="center", fontsize=10.5, color=GRAY)
 
 # ── Agent + tools ─────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ rev_bg = FancyBboxPatch((12.22, 2.8), 2.6, 0.9,
 ax.add_patch(rev_bg)
 ax.text(13.52, 3.52, "Reverse audit", ha="center", fontsize=10,
         fontweight="bold", color=ORANGE, zorder=5)
-ax.text(13.52, 3.2, '"fare_alerts_feed was wrong —', ha="center",
+ax.text(13.52, 3.2, '"fare_alerts_feed was wrong -', ha="center",
         fontsize=8.5, color=SLATE, zorder=5)
 ax.text(13.52, 2.95, 'what decisions relied on it?"', ha="center",
         fontsize=8.5, color=SLATE, zorder=5)

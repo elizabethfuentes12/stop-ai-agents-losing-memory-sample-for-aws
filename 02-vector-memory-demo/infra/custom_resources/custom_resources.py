@@ -8,7 +8,7 @@ class VectorStoreResources(Construct):
     """Provisions S3 Vectors bucket+index and DynamoDB table+vector-index.
 
     Uses a Lambda-backed Custom Resource because both services were added to boto3
-    after their native CloudFormation support — the Lambda bundles boto3>=1.43.72.
+    after their native CloudFormation support, the Lambda bundles boto3>=1.43.72.
     """
 
     def __init__(self, scope: Construct, construct_id: str,

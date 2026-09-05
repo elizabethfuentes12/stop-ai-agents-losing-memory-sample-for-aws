@@ -11,7 +11,7 @@ Based on research:
 - [PoisonedRAG: Knowledge Corruption Attacks to RAG](https://arxiv.org/abs/2402.07867), Zou et al., USENIX Security 2025 (peer-reviewed)
 - [MINJA: Memory INJection Attack](https://arxiv.org/abs/2503.03704), preprint
 
-This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) for the graph track. The patterns are framework-agnostic and carry over to other agent frameworks.
+This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) for the graph track.
 
 > **Official integration.** The graph track wires Neo4j by hand on purpose, to expose the write path and the `DETACH DELETE` blast radius that a managed layer would hide. For production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/) (a `Neo4jSessionManager` you attach with `Agent(session_manager=...)`). It is a Neo4j Labs package (community-supported), not part of the Strands SDK core.
 

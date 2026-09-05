@@ -1,5 +1,5 @@
 """
-Interactive flight assistant — SELECTIVE MEMORY, one store (Mechanism A).
+Interactive flight assistant, SELECTIVE MEMORY, one store (Mechanism A).
 
 Chat with an agent that remembers across turns using Strands' native
 `MemoryManager` with ONE vector-backed store and one general selection prompt.
@@ -16,7 +16,7 @@ Try these, one per line, and watch the memory panel after each:
   "What do you know about me?"                              -> recalls from memory
 
 Commands:  /memory  (show everything stored)   /quit
-Backend:   VECTOR_BACKEND=s3 (default) or dynamodb  — set in .env.
+Backend:   VECTOR_BACKEND=s3 (default) or dynamodb , set in .env.
 """
 
 import os
@@ -67,7 +67,7 @@ def show_memory(store: VectorMemoryStore) -> None:
     print(f"\n  🧠 memory now holds {store.count()} item(s):")
     hits = store._backend.query(ms.embed(RECALL_QUERY), top_k=20)
     if not hits:
-        print("     (empty — nothing worth keeping yet)")
+        print("     (empty, nothing worth keeping yet)")
     for text, _ in hits:
         print(f"     - {text}")
     print()
@@ -91,7 +91,7 @@ def main() -> None:
     )
 
     # Start from an empty store so you can watch memory fill from zero. In
-    # production you would NOT clear it — the whole point is that memory persists
+    # production you would NOT clear it, the whole point is that memory persists
     # across sessions (that survival is what the notebook's Step 4 demonstrates).
     store.clear()
 

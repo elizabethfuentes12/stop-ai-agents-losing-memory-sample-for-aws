@@ -1,30 +1,30 @@
-"""Decision traces over a key-value store (agent.state) — the standalone track.
+"""Decision traces over a key-value store (agent.state), the standalone track.
 
 Most memory stores *what* the agent knows (demos 01-04 of this series). Almost nothing stores *why it
 decided*: the question → tool steps → evidence → outcome chain. Without it, "why did you
-recommend X?" a week later gets a confabulated answer — the agent invents a plausible
+recommend X?" a week later gets a confabulated answer, the agent invents a plausible
 justification because the real one was never kept.
 
 This module holds two things:
 
-  1. ``DecisionTraceRecorder`` — a Strands ``HookProvider`` that captures a decision
+  1. ``DecisionTraceRecorder``, a Strands ``HookProvider`` that captures a decision
      trace automatically from the agent's lifecycle events. **Zero changes to your
      tools**: it subscribes to the hook events every tool call already emits.
 
   2. A flat trace store over ``agent.state`` plus the deterministic query functions the
-     measurement uses. The flat store answers "why did I decide X?" perfectly well — the
+     measurement uses. The flat store answers "why did I decide X?" perfectly well, the
      trace is right there as one blob. Where it falls short is the *reverse* question:
-     "evidence source S turned out to be false — which of my decisions depended on it?"
+     "evidence source S turned out to be false, which of my decisions depended on it?"
      A flat scan finds decisions that cite S **directly**; a decision that depended on S
      *through another decision's output* doesn't mention S anywhere in its own blob. You
      can rebuild that chain in application code on every query, or store it as a graph
-     and traverse it — that contrast is trace_graph.py, and it is the point of this demo.
+     and traverse it, that contrast is trace_graph.py, and it is the point of this demo.
 
 Honesty note (stated in the README too): "reasoning memory" is an engineering pattern,
 not an established category in the academic memory taxonomies. The closest verified
 research is the traceability theme in recent memory systems:
-  https://arxiv.org/abs/2601.18204 (MemWeaver — traceable long-horizon agentic reasoning)
-  https://arxiv.org/abs/2606.09900 ("Less Context, More Accuracy" — the Engram system;
+  https://arxiv.org/abs/2601.18204 (MemWeaver, traceable long-horizon agentic reasoning)
+  https://arxiv.org/abs/2606.09900 ("Less Context, More Accuracy", the Engram system;
       every stored fact keeps provenance and a supersession chain. Single-author preprint.)
 """
 
@@ -40,14 +40,14 @@ from strands.hooks import (
 TRACES_KEY = "decision_traces"
 
 
-# ── The recorder (a Strands HookProvider — no changes to any tool) ───────────
+# ── The recorder (a Strands HookProvider, no changes to any tool) ───────────
 class DecisionTraceRecorder(HookProvider):
     """Records one decision trace per agent invocation into ``agent.state``.
 
     Attach with ``Agent(hooks=[DecisionTraceRecorder()])``. The recorder listens to:
-      - ``BeforeInvocationEvent`` — opens a trace with the user's question,
-      - ``AfterToolCallEvent``    — appends a step (tool, input, evidence) per tool call,
-      - ``AfterInvocationEvent``  — closes the trace with the final outcome and persists
+      - ``BeforeInvocationEvent``, opens a trace with the user's question,
+      - ``AfterToolCallEvent``   , appends a step (tool, input, evidence) per tool call,
+      - ``AfterInvocationEvent`` , closes the trace with the final outcome and persists
         it under ``agent.state["decision_traces"]`` (JSON-serializable, so it survives
         with a session manager just like any other state).
     """
@@ -106,15 +106,15 @@ def _result_text(result) -> str:
 
 # ── Seeded decision history (shared with the graph track) ────────────────────
 # Five past decisions of a travel assistant, in the exact shape the recorder produces,
-# plus explicit evidence provenance ("source"). Four depend on the reviews feed — two
+# plus explicit evidence provenance ("source"). Four depend on the reviews feed, two
 # directly, two only through other decisions' outputs (a provenance chain one and two
-# hops deep) — and one (the control) does not depend on it at all. Deterministic, so
+# hops deep), and one (the control) does not depend on it at all. Deterministic, so
 # the measurement is reproducible.
 
 COMPROMISED_SOURCE = "fare_alerts_feed"
 
 # External evidence sources (everything else in a "source" field names another
-# evidence record — a derivation, not an origin).
+# evidence record, a derivation, not an origin).
 EXTERNAL_SOURCES = {"flight_search", "fare_alerts_feed", "weather_api"}
 
 # Decisions whose evidence chain truly reaches fare_alerts_feed (ground truth for the check).
@@ -154,7 +154,7 @@ SEED_TRACES = [
     },
     {
         # The indirect dependency: this decision starts from the *outputs* of the two
-        # flight decisions. Its own blob never mentions fare_alerts_feed — the link to
+        # flight decisions. Its own blob never mentions fare_alerts_feed, the link to
         # the compromised source exists only through the evidence chain.
         "id": "trip-budget",
         "question": "What flight budget do I need for the two-city trip?",
@@ -203,7 +203,7 @@ SEED_TRACES = [
 def replay_why(traces: list, topic: str) -> dict | None:
     """Answer "why did I decide X?" from the flat store: find the trace whose outcome
     or question mentions the topic and return it whole. This is where a flat trace
-    store shines — the full chain is one lookup away.
+    store shines, the full chain is one lookup away.
     """
     topic_lower = topic.lower()
     for trace in traces:
@@ -216,7 +216,7 @@ def find_affected_decisions_kv(traces: list, source_name: str) -> list:
     """The reverse audit over the flat store: which decisions cite this source DIRECTLY?
 
     A linear scan of each trace's own evidence. This is the query a flat store naturally
-    answers — and its honest limitation: a decision that depended on the source only
+    answers, and its honest limitation: a decision that depended on the source only
     through another decision's output has no mention of the source in its own blob, so
     the scan cannot see it. (Chasing ``source`` fields across blobs recursively would
     mean rebuilding the graph in application code on every query.)
@@ -259,7 +259,7 @@ def search_flights(origin: str, destination: str, departure_date: str,
 def check_fare_alert(route: str) -> str:
     """Check whether a route currently has a below-typical fare alert.
 
-    Use this tool after searching, when deciding WHICH offer to recommend —
+    Use this tool after searching, when deciding WHICH offer to recommend -
     an active alert is evidence that a fare is unusually good.
 
     Args:
@@ -289,7 +289,7 @@ def check_fare_alert(route: str) -> str:
 # ── The Strands harness layer: the agent answers "why?" from its own traces ──
 @tool(context=True)
 def why_did_i(topic: str, tool_context: ToolContext) -> str:
-    """Replay the decision trace behind a past decision — the real reasoning, not a guess.
+    """Replay the decision trace behind a past decision, the real reasoning, not a guess.
 
     Use this whenever the user asks WHY a past recommendation or decision was made.
     Looks the decision up in the recorded traces and returns the step-by-step chain:

@@ -1,11 +1,11 @@
-"""Domain tools for the selective-memory demo — live flight and climate APIs.
+"""Domain tools for the selective-memory demo, live flight and climate APIs.
 
 Memory is NOT handled here. In this demo, remembering is done by Strands' native
 memory framework (`MemoryManager` + a `MemoryStore` + a `ModelExtractor`; see
 `memory_config.py`), not by hand-rolled memory tools and not by instructions in the
 chat agent's system prompt. These tools are the agent's *domain* capabilities only.
 
-The flight and climate tools call live APIs (Duffel sandbox, Open-Meteo) — no
+The flight and climate tools call live APIs (Duffel sandbox, Open-Meteo), no
 hardcoded data. They are deliberately memory-free: the agent just talks and acts,
 and the `MemoryManager` extracts what's worth keeping off the conversation path.
 """
@@ -56,7 +56,7 @@ def book_flight(offer_id: str) -> str:
 
     Returns:
         JSON: {"status": "CONFIRMED", "offer_id", "price", "currency", "route",
-               "cabin", "carriers"} — or an error string if the offer expired.
+               "cabin", "carriers"}, or an error string if the offer expired.
     """
     offer = flights_api.get_offer(offer_id)
     if offer is None:

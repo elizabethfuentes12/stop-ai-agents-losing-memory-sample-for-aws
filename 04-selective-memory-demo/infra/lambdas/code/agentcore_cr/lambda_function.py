@@ -1,13 +1,13 @@
-"""Custom Resource handler — AgentCore Memory and S3 Vectors indexes for Demo 04.
+"""Custom Resource handler, AgentCore Memory and S3 Vectors indexes for Demo 04.
 
 CloudFormation calls this Lambda on Create/Update/Delete.
 AgentCore Memory and S3 Vectors have no native CloudFormation support (2025),
 so lifecycle is managed here using boto3>=1.43.72 bundled as a Lambda layer.
 
 ResourceType field in Properties selects which resource to manage:
-  "S3VectorBucket"  — create/delete the vector bucket
-  "S3VectorIndex"   — create/delete one vector index inside the bucket
-  "AgentCoreMemory" — create/delete an AgentCore Memory with 4 built-in strategies
+  "S3VectorBucket" , create/delete the vector bucket
+  "S3VectorIndex"  , create/delete one vector index inside the bucket
+  "AgentCoreMemory", create/delete an AgentCore Memory with 4 built-in strategies
 """
 import json
 import threading
@@ -46,7 +46,7 @@ def handler(event, context):
     props = event.get("ResourceProperties", {})
     resource_type = props["ResourceType"]
     request_type = event["RequestType"]
-    # PhysicalResourceId from a previous Create/Update — needed for Delete.
+    # PhysicalResourceId from a previous Create/Update, needed for Delete.
     existing_physical_id = event.get("PhysicalResourceId", "UNKNOWN")
 
     try:
@@ -139,7 +139,7 @@ def handle_agentcore_memory(request_type, props, existing_physical_id="UNKNOWN")
         if memory_id is None:
             resp = ctrl.create_memory(
                 name=memory_name,
-                description="Selective-memory demo — 4 built-in strategies",
+                description="Selective-memory demo, 4 built-in strategies",
                 eventExpiryDuration=7,
                 memoryStrategies=[
                     {"semanticMemoryStrategy": {"name": "facts"}},

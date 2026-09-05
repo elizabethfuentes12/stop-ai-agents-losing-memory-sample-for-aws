@@ -2,9 +2,9 @@
 Architecture diagram for the selective memory demo.
 
 Shows the 3 selection mechanisms side by side:
-  A — agent tools with a memory sub-agent (selection delegated per tool call)
-  B — own extractor off-path (4 typed prompts → S3 Vectors or DynamoDB)
-  C — AgentCore managed (async, ~53-85 s lag)
+  A: agent tools with a memory sub-agent (selection delegated per tool call)
+  B: own extractor off-path (4 typed prompts → S3 Vectors or DynamoDB)
+  C: AgentCore managed (async, ~53-85 s lag)
 
 Run: uv run python generate_architecture.py
 Output: ai-agent-selective-memory-architecture.png
@@ -57,7 +57,7 @@ ax.axis("off")
 # ── Title ─────────────────────────────────────────────────────────────────────
 ax.text(7.5, 7.65, "3 Ways to Select What an AI Agent Remembers", ha="center",
         fontsize=17, fontweight="bold", color=NAVY)
-ax.text(7.5, 7.25, "Same conversation, same ground truth (5 keepers + 3 decoys) — only the selection mechanism changes",
+ax.text(7.5, 7.25, "Same conversation, same ground truth (5 keepers + 3 decoys), only the selection mechanism changes",
         ha="center", fontsize=10.5, color=GRAY)
 
 # ── Input: conversation ───────────────────────────────────────────────────────
@@ -67,9 +67,9 @@ rbox(ax, 1.4, 4.4, 2.3, 3.2,
 
 # ── Column headers ────────────────────────────────────────────────────────────
 cols = [
-    (4.7,  "A — Agent tools", "Memory sub-agent",  TEAL),
-    (8.0,  "B — Off-path", "Own extractor",         BLUE),
-    (11.5, "C — Managed", "AgentCore",              ORANGE),
+    (4.7,  "A, Agent tools", "Memory sub-agent",  TEAL),
+    (8.0,  "B, Off-path", "Own extractor",         BLUE),
+    (11.5, "C, Managed", "AgentCore",              ORANGE),
 ]
 for cx, h1, h2, col in cols:
     ax.text(cx, 7.0, h1, ha="center", fontsize=13, fontweight="bold", color=col)
@@ -133,9 +133,9 @@ ax.text(11.5, 1.64, "~0.4 s/turn overhead\nAvailable: ~53-85 s  (measured)", ha=
         fontsize=8.5, color=SLATE, zorder=5)
 
 # ── Footnote ──────────────────────────────────────────────────────────────────
-ax.text(7.5, 0.9, "* C is nondeterministic — extraction criteria are managed by AWS, not user-controlled",
+ax.text(7.5, 0.9, "* C is nondeterministic, extraction criteria are managed by AWS, not user-controlled",
         ha="center", fontsize=8.5, color=GRAY, fontstyle="italic")
-ax.text(7.5, 0.6, "B is 'AgentCore built by hand': same pipeline, same types — you own the extraction prompts",
+ax.text(7.5, 0.6, "B is 'AgentCore built by hand': same pipeline, same types, you own the extraction prompts",
         ha="center", fontsize=8.5, color=GRAY, fontstyle="italic")
 
 plt.tight_layout(pad=0.3)

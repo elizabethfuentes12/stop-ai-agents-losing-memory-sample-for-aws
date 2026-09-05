@@ -1,23 +1,23 @@
 """Graph memory layer for the graph-memory demo.
 
 Semantic memory (Demo 02) retrieves by *similarity* but cannot reason over
-*relationships*. A multi-hop question — "Who do I know that's connected to
-flights to Spain?" — needs a different move: find an entry point by
+*relationships*. A multi-hop question, "Who do I know that's connected to
+flights to Spain?", needs a different move: find an entry point by
 vector similarity, then **traverse the graph** to the answer.
 
 This module builds a small knowledge graph of what the agent has learned across
 sessions and exposes the two retrieval strategies the demo contrasts:
 
-  - Before: ``VectorRetriever`` — pure vector similarity. Returns the individually
+  - Before: ``VectorRetriever``, pure vector similarity. Returns the individually
     most-similar memory nodes. It surfaces "Iberia", "Madrid", "Spain" as separate
     pieces but never connects them to the person, because similarity has no notion
     of a relationship.
-  - After: ``VectorCypherRetriever`` — vector similarity to find an entry node, then
+  - After: ``VectorCypherRetriever``, vector similarity to find an entry node, then
     a Cypher traversal that walks the relationships back to the person. It answers
     "Maya Torres" and returns the path Maya -> Iberia -> Madrid -> Spain.
 
 Both strategies receive the SAME facts. The graph wins because it stores them as
-connected nodes, not because it is given the answer — the advantage is structural.
+connected nodes, not because it is given the answer, the advantage is structural.
 
 The graph is a *known*, seeded graph (explicit MERGE statements), so the demo is
 reproducible run to run. A production system would extract entities from natural
@@ -26,9 +26,9 @@ that is powerful but non-deterministic, which is why the teaching demo seeds a f
 graph and the README shows the pipeline as an optional upgrade.
 
 Research on graph-structured agent memory:
-  https://arxiv.org/abs/2603.27910 (GAAMA — Graph Augmented Associative Memory for Agents)
-  https://arxiv.org/abs/2601.03236 (MAGMA — Multi-Graph based Agentic Memory Architecture)
-  https://arxiv.org/abs/2605.01688 (GRAVITY — structured anchoring for long-horizon memory)
+  https://arxiv.org/abs/2603.27910 (GAAMA, Graph Augmented Associative Memory for Agents)
+  https://arxiv.org/abs/2601.03236 (MAGMA, Multi-Graph based Agentic Memory Architecture)
+  https://arxiv.org/abs/2605.01688 (GRAVITY, structured anchoring for long-horizon memory)
 
 Neo4j facts used here are from the official Neo4j docs: native vector index
 (``CREATE VECTOR INDEX``, cosine, dims 1-4096) and the documented "vector search then
@@ -59,7 +59,7 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 
 # The demo uses its OWN isolated database so it never touches other graphs on the
 # same server. On Neo4j Community (single database) this falls back to the default
-# database automatically — see ensure_database().
+# database automatically, see ensure_database().
 NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "memorydemo")
 DEFAULT_DATABASE = os.getenv("NEO4J_DEFAULT_DATABASE", "neo4j")
 
@@ -70,7 +70,7 @@ VECTOR_INDEX_NAME = "memory_embeddings"
 NODE_LABEL = "Memory"         # every memory node carries this label; the index is on it
 
 # ── The seeded memory graph (a KNOWN graph → reproducible) ───────────────────
-# What the agent remembered in PREVIOUS sessions (via remember_fact — Test 3 shows
+# What the agent remembered in PREVIOUS sessions (via remember_fact, Test 3 shows
 # the live write path), replayed here as explicit triples so the before/after
 # measurement is deterministic. These are the SAME facts the flat/semantic memory
 # in the "before" case receives.
@@ -93,7 +93,7 @@ NODE_TYPES = {
 
 # The text we embed for each node. Deliberately NEUTRAL: it does not echo the
 # query wording ("who do I know"), so pure vector similarity genuinely cannot
-# identify the person — only the graph traversal can. This keeps the contrast honest.
+# identify the person, only the graph traversal can. This keeps the contrast honest.
 NODE_TEXT = {
     "Maya Torres": "Maya Torres. A contact name.",
     "Iberia":      "Iberia. An airline.",
@@ -142,7 +142,7 @@ def get_embedder() -> OpenAIEmbeddings:
     """Real OpenAI embeddings (text-embedding-3-small), same model as Demo 02.
 
     To use Amazon Bedrock (Amazon Titan) embeddings instead, see the commented
-    block in the README — swap this for a Bedrock embedder in the production demo.
+    block in the README, swap this for a Bedrock embedder in the production demo.
     """
     return OpenAIEmbeddings(model=EMBED_MODEL)
 
@@ -160,14 +160,14 @@ def ensure_database(driver) -> str:
        So the retrievers fail with ``Invalid input 'SEARCH'`` on a Cypher-5 database.
 
        The correct, supported fix is to give the database Cypher 25 as its own default
-       language — set atomically when the database is created:
+       language, set atomically when the database is created:
 
            CREATE DATABASE memorydemo IF NOT EXISTS DEFAULT LANGUAGE CYPHER 25
 
        This is the mechanism Neo4j documents for per-database language (no ``neo4j.conf``
        edit, no server restart). We gate the language clause on the library's own
        ``supports_search_clause`` so it stays in sync with what the retrievers actually
-       emit — on Neo4j 5.x they use the classic ``db.index.vector.queryNodes`` procedure,
+       emit, on Neo4j 5.x they use the classic ``db.index.vector.queryNodes`` procedure,
        which needs no language change, so we create a plain database there.
 
     On Neo4j Community (single database, no ``CREATE``/``ALTER DATABASE``) this falls back
@@ -195,7 +195,7 @@ def ensure_database(driver) -> str:
         return db
     except Exception as exc:
         # Community edition (or restricted permissions): can't create/alter databases.
-        # Fall back to the default database — the demo still runs, but it shares a database.
+        # Fall back to the default database, the demo still runs, but it shares a database.
         db = DEFAULT_DATABASE
         print(
             f"  ⚠️  Could not create database '{NEO4J_DATABASE}' ({str(exc).splitlines()[0][:80]}).\n"
@@ -226,7 +226,7 @@ def _wait_for_database_online(driver, db: str, timeout_s: float = 30.0) -> None:
 def reset_graph(driver, db: str) -> None:
     """Remove this demo's nodes and vector index so a rerun starts clean.
 
-    Scoped to :Memory nodes and this demo's index only — it never runs a blanket
+    Scoped to :Memory nodes and this demo's index only, it never runs a blanket
     'delete everything', so it is safe even if the demo shares a database.
     """
     drop_index_if_exists(driver, VECTOR_INDEX_NAME, neo4j_database=db)
@@ -240,7 +240,7 @@ def seed_graph(driver, db: str, embedder: OpenAIEmbeddings) -> dict:
     Returns a small summary dict (node/relationship/index counts) for the test output.
     """
     # 1) Nodes: each memory node gets its neutral text, a type label, and a real embedding.
-    #    The embedding is computed once here (write time) — the production pattern, and the
+    #    The embedding is computed once here (write time), the production pattern, and the
     #    reason the query path only has to embed the query itself.
     with driver.session(database=db) as session:
         for name, node_type in NODE_TYPES.items():
@@ -297,7 +297,7 @@ def _wait_for_index_online(driver, db: str, name: str, timeout_s: float = 20.0) 
 
 
 def make_semantic_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> VectorRetriever:
-    """Pure vector similarity retriever — returns the most similar nodes, no traversal.
+    """Pure vector similarity retriever, returns the most similar nodes, no traversal.
 
     On a multi-hop question it surfaces related concepts as separate pieces but cannot
     connect them to a person, because similarity has no notion of a relationship.
@@ -315,7 +315,7 @@ def make_graph_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> VectorC
     """Vector similarity + Cypher graph traversal retriever.
 
     Finds an entry node by similarity, then walks the relationships back to a Person
-    and returns the full chain — the multi-hop answer.
+    and returns the full chain, the multi-hop answer.
     """
     return VectorCypherRetriever(
         driver,

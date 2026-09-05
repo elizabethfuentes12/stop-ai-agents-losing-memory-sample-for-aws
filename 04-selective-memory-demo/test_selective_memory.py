@@ -293,20 +293,11 @@ def run_mechanism_c():
             text += " ".join(recs) + " "
         return text, per
 
-    # Extraction across the four strategies completes at different times. Reading
-    # once the instant facts appears is unfair (the slower strategies haven't run
-    # yet). Poll until recall stops improving (or a generous cap), so we score what
-    # AgentCore actually extracts, not a premature read.
-    stored_text, per_ns = read_all()
-    best = score(stored_text)
-    for _ in range(12):                       # up to ~2 more minutes
-        if best["kept"] >= best["kept_of"]:
-            break
-        time.sleep(10)
-        text, per = read_all()
-        s = score(text)
-        if s["kept"] > best["kept"]:
-            best, stored_text, per_ns = s, text, per
+    # Extraction across the four strategies completes at different times. The
+    # waiter (in agentcore_memory, using a proper wait, not a bare sleep) re-reads
+    # and re-scores until the score stabilizes, so we score what AgentCore actually
+    # extracts, not a premature first read.
+    best, stored_text, per_ns = acm.wait_until_stable(read_all, score)
 
     result = best
     result.update({

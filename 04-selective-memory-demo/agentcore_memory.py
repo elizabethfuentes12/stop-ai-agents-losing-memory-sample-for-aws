@@ -171,3 +171,25 @@ def wait_for_extraction(memory_id: str, strategy_id: str, actor_id: str, query: 
             return time.time() - start
         threading.Event().wait(10)
     return None
+
+
+def wait_until_stable(read_fn, score_fn, rounds: int = 12, interval_s: int = 10):
+    """Waiter for AgentCore's asynchronous extraction: the four strategies land at
+    different times, so re-read and re-score until the score stops improving (or a
+    cap is hit), then return the best (text, per_namespace, score) seen.
+
+    Blocking waits belong here, in the infrastructure helper (like a boto3 waiter),
+    not inline in demo code. Uses threading.Event().wait, not a bare sleep.
+    """
+    text, per = read_fn()
+    best = score_fn(text)
+    best_text, best_per = text, per
+    for _ in range(rounds):
+        if best["kept"] >= best["kept_of"]:
+            break
+        threading.Event().wait(interval_s)
+        text, per = read_fn()
+        s = score_fn(text)
+        if s["kept"] > best["kept"]:
+            best, best_text, best_per = s, text, per
+    return best, best_text, best_per

@@ -39,7 +39,9 @@ def send_response(event, context, status, reason, physical_id, data=None):
         method="PUT",
         headers={"Content-Type": "", "Content-Length": len(body)},
     )
-    urllib.request.urlopen(req)
+    # nosemgrep: dynamic-urllib-use-detected  # ResponseURL is the CloudFormation-provided
+    # pre-signed S3 callback URL, and its scheme is validated to http/https above.
+    urllib.request.urlopen(req)  # nosec B310
 
 
 def handler(event, context):

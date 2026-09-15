@@ -19,11 +19,11 @@ from strands import tool
 
 # ── The write-gate (store-agnostic) ──────────────────────────────────────────
 _INJECTION_PATTERNS = [
-    (re.compile(r"\bignore (all |the )?(previous|prior|above) (instructions|context|prompts?)\b", re.I),
+    (re.compile(r"\bignore (all |the )?(previous|prior|above|budget|spending|price|cost) (instructions|context|prompts?|limits?|caps?|constraints?|rules?)\b", re.I),
      "injected instruction override"),
-    (re.compile(r"\bdisregard (all |the )?(previous|prior|safety|your) (instructions|rules|guidelines)\b", re.I),
+    (re.compile(r"\bdisregard (all |the )?(previous|prior|safety|your|budget|spending) (instructions|rules|guidelines|limits?|caps?)\b", re.I),
      "injected instruction override"),
-    (re.compile(r"\b(always|from now on)\b.{0,20}\b(recommend|say|reply|respond|answer|suggest)\b", re.I),
+    (re.compile(r"\b(always|from now on)\b.{0,25}\b(recommend|say|reply|respond|answer|suggest|book|choose|pick|use)\b", re.I),
      "injected standing directive"),
     (re.compile(r"\bsystem prompt\b|\byou are now\b|\bnew instructions?:\b", re.I),
      "attempt to rewrite the agent's role"),
@@ -84,7 +84,7 @@ def build_screen_classifier(model):
     """Build a small agent whose only job is to classify candidate memories.
 
     A separate LLM invocation from the travel agent, with its own role, returning a
-    typed ScreenVerdict via structured output. Screening is a cheap classification
+    typed ScreenVerdict via structured output. Screening is a simple classification
     task, so pass a small, inexpensive model (e.g. gpt-4o-mini or Amazon Nova Lite),
     not the agent's main model.
     """

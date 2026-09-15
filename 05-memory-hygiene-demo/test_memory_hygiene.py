@@ -34,6 +34,7 @@ from hygiene_agent import (
     REAL_TOOLS,
 )
 import hygiene_graph as hg
+import hygiene_kv as kv
 
 # A paraphrased attack that reads like a real user bending the agent's memory in
 # their favor, not obvious spam. It carries an instruction override plus a false
@@ -175,9 +176,30 @@ async def run_graph_track():
         driver.close()
 
 
+def run_kv_blast_radius():
+    """Blast radius in key-value memory (agent.state, the Demo 01 pattern). The
+    poison is one blob under one key, so it skews at most its own lookup: 1 of 4.
+    Gate drops it (0/4); forget removes it after the fact (0/4). Deterministic."""
+    print("\n" + "=" * 70)
+    print("KEY-VALUE MEMORY (agent.state), blast radius")
+    print("=" * 70)
+    s = kv.seed_store(); kv.poison_store_ungated(s)
+    poisoned = kv.store_blast_radius(s)
+    _rule(f"poisoned (no gate): {poisoned['contaminated']}/{poisoned['total']} lookups skewed",
+          poisoned["contaminated"] == 1)
+    s_g = kv.seed_store(); verdict = kv.poison_store_gated(s_g)
+    gated = kv.store_blast_radius(s_g)
+    _rule(f"gated: allowed={verdict['allowed']}, {gated['contaminated']}/{gated['total']}",
+          (not verdict["allowed"]) and gated["contaminated"] == 0)
+    kv.forget_store_poison(s)
+    cleaned = kv.store_blast_radius(s)
+    _rule(f"cleaned (forget): {cleaned['contaminated']}/{cleaned['total']}", cleaned["contaminated"] == 0)
+
+
 async def main():
     await run_flat_track()
     await run_gate_examples()
+    run_kv_blast_radius()
     await run_graph_track()
     print("\nDone.")
 

@@ -2,9 +2,9 @@
 
 **Problem:** Key-value memory (Demo 01) is perfect when you know the key. But users ask by *meaning*: "what should I avoid eating on this trip?" The answer sits under `dietary_notes`, and the question names no key and shares no words with the stored note.
 
-**Solution:** Semantic search: embed each memory once at write time, embed the question at query time, retrieve by cosine similarity. You prototype the idea locally with [FAISS](https://github.com/facebookresearch/faiss) (an in-process library, zero infrastructure), then move to a managed store for anything that has to survive a restart or scale. On AWS that store is **Amazon S3 Vectors** or **Amazon DynamoDB Vector Search**, and this demo runs the same memories through all three so you can see the accuracy is identical and the choice is about where the vectors live.
+**Solution:** Semantic search: embed each memory once at write time, embed the question at query time, retrieve by cosine similarity. You prototype the idea locally with [FAISS](https://github.com/facebookresearch/faiss) (an in-process library, zero infrastructure), then move to a managed store for anything that has to survive a restart. On AWS that store is **Amazon S3 Vectors**. The notebook runs the same memories through a key-value baseline, FAISS, and S3 Vectors, so the vector backends return the same answer and the choice is about where the vectors live.
 
-This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python), [FAISS](https://github.com/facebookresearch/faiss), [Amazon S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el), and [Amazon Titan Text Embeddings V2](https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el).
+This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) (1.55.1), [FAISS](https://github.com/facebookresearch/faiss), [Amazon S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el), and [Amazon Titan Text Embeddings V2](https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) (1024 dims).
 
 ---
 
@@ -12,31 +12,28 @@ This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python), [
 
 ### The measured result
 
-| Store | Category | Finds the answer | Similarity score | Survives restart |
-|-------|----------|:----------------:|:----------------:|:----------------:|
-| Key-value (keyword scan) | baseline | **No** (no shared words) | n/a | n/a |
-| FAISS | in-process library (prototype) | **Yes** | **0.231** | No |
-| S3 Vectors | managed AWS storage | **Yes** | **0.231** | Yes |
-| DynamoDB Vector Search | managed, in your table | **Yes** | **0.231** | Yes |
+| Store | Category | Finds the answer | Survives restart |
+|-------|----------|:----------------:|:----------------:|
+| Key-value (keyword scan) | baseline | **No** (no shared words) | n/a |
+| FAISS | in-process library (prototype) | **Yes** | No |
+| S3 Vectors | managed AWS storage | **Yes** | Yes |
 
-All three vector backends return the same answer with the same similarity score: **accuracy is identical**, because they all use the same Titan V2 embeddings. So the backend is not an accuracy decision, it is about whether the memory has to persist and how you want to operate it. FAISS is the fastest way to prototype the idea in-process; S3 Vectors and DynamoDB Vector Search are the managed options that survive restarts and scale.
+Both vector backends return the same answer with the same similarity score, because they use the same Titan V2 embeddings. So the backend is not an accuracy decision, it is about whether the memory has to persist and how you want to operate it. FAISS is the fastest way to prototype the idea in-process; S3 Vectors is the managed option that survives restarts. The notebook prints the actual score and latency it measures on your run.
 
-![Semantic search flow: embed the question with Titan V2, then query the vector store by cosine similarity; the same query returns the same answer whether the store is FAISS, S3 Vectors, or DynamoDB](images/ai-agent-faiss-vs-s3-vectors-tradeoff.png)
-
-![DynamoDB Vector Search stores embeddings inside the existing table alongside operational data, unlike S3 Vectors which uses a separate dedicated bucket](images/ai-agent-dynamodb-vectors-inside-table.png)
+![Semantic search flow: embed the question with Titan V2, then query the vector store by cosine similarity; the same query returns the same answer whether the store is FAISS or S3 Vectors](images/ai-agent-faiss-vs-s3-vectors-tradeoff.png)
 
 ### When to use which
 
-FAISS and the managed stores are not competing on the same axis: FAISS is an in-process library for prototyping, and S3 Vectors / DynamoDB Vector Search are managed services for anything that must persist. Pick by stage and operational fit, not by a query-latency race (they all return the same answer, and the Titan V2 embedding call dominates end-to-end time regardless).
+FAISS and the managed store are not competing on the same axis: FAISS is an in-process library for prototyping, and S3 Vectors is a managed service for anything that must persist. Pick by stage and operational fit, not by a query-latency race (both return the same answer, and the Titan V2 embedding call dominates end-to-end time regardless).
 
-| | FAISS | Amazon S3 Vectors | Amazon DynamoDB Vector Search | Dedicated vector database |
-|---|---|---|---|---|
-| **Type** | In-process library | Managed AWS storage | Vector index in your DynamoDB table | Full database engine |
-| **Best for** | Prototype / local experiment | Standalone vector store at scale, infrequent access ([docs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el)) | Real-time retrieval collocated with operational data ([docs](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/VectorSearch.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el)) | High QPS, hybrid search, advanced filtering |
-| **Infrastructure** | None (pip install) | None (fully managed) | None (your existing table) | Self-hosted or managed |
-| **Survives restart** | No | Yes | Yes | Yes |
-| **Semantic accuracy** | same | same | same | same |
-| **Examples** | n/a | n/a | n/a | OpenSearch, Qdrant, Weaviate, Milvus, pgvector, Chroma |
+| | FAISS | Amazon S3 Vectors | Dedicated vector database |
+|---|---|---|---|
+| **Type** | In-process library | Managed AWS storage | Full database engine |
+| **Best for** | Prototype / local experiment | Standalone vector store at scale, infrequent access ([docs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el)) | High QPS, hybrid search, advanced filtering |
+| **Infrastructure** | None (pip install) | None (fully managed) | Self-hosted or managed |
+| **Survives restart** | No | Yes | Yes |
+| **Semantic accuracy** | same | same | same |
+| **Examples** | n/a | n/a | OpenSearch, Qdrant, Weaviate, Milvus, pgvector, Chroma |
 
 ### The decision table
 
@@ -44,8 +41,7 @@ FAISS and the managed stores are not competing on the same axis: FAISS is an in-
 |----------|------|-----|
 | Facts under known keys (profile, prefs) | Key-value ([Demo 01](../01-key-value-memory-demo/)) | Exact and instant. Don't pay embeddings for lookups |
 | Semantic search, local / prototype | **FAISS** | Zero infrastructure, pip install, in-process |
-| Semantic search, cloud / infrequent queries | **S3 Vectors** | Purpose-built AWS vector storage, subsecond latency, up to 2B vectors |
-| Agent data already in DynamoDB | **DynamoDB Vector Search** | Add a vector index to the existing table; single-digit ms query latency |
+| Semantic search, cloud / persistent | **S3 Vectors** | Purpose-built AWS vector storage, subsecond latency, up to 2B vectors |
 | High QPS, hybrid search, or advanced filtering | **Dedicated vector DB** | OpenSearch, Qdrant, Weaviate, Milvus, pgvector, Chroma |
 | Multi-hop questions over relationships | Graph ([Demo 03](../03-graph-memory-demo/)) | Similarity can't follow edges |
 
@@ -60,8 +56,7 @@ FAISS and the managed stores are not competing on the same axis: FAISS is an in-
 | **1. The key-value limit** | Keyword scan misses the semantic question; dump-all pays for the whole memory per question |
 | **2. FAISS** | Same memories retrieved by meaning; query latency measured after warm-up |
 | **3. S3 Vectors** | Same again, plus a fresh client (the "restart") still sees every vector |
-| **4. DynamoDB Vector Search** | Same accuracy, single-digit ms latency; vector index lives inside a DynamoDB table alongside your operational data |
-| **Notebook** | Both recall tools attached to one agent; it picks key-lookup vs semantic per question from the tool docstrings alone |
+| **4. A real agent choosing tools** | Both recall tools attached to one agent; it picks key-lookup vs semantic per question from the tool docstrings alone |
 
 ---
 
@@ -83,7 +78,11 @@ cp .env.example .env   # set OPENAI_API_KEY; optionally VECTOR_BUCKET / VECTOR_I
 uv venv && uv pip install -r requirements.txt
 ```
 
-### Run Demo
+### Deterministic vs model-based
+
+The control lives in the agent's harness: the recall tools the agent calls. The keyword scan, the cosine similarity search, and the stores are deterministic. The embedding (Titan V2) and the agent's tool choice are model-based; an embedding is a model call, not arithmetic, and neural-network inference varies with floating-point non-associativity across runs ([research](https://arxiv.org/abs/2601.17768)). The cosine math over the vectors is deterministic; producing the vectors is not.
+
+## Run Demo
 
 ```bash
 uv run python test_vector_memory.py
@@ -98,9 +97,9 @@ uv run python test_vector_memory.py
 
 | File | Purpose |
 |------|---------|
-| `test_vector_memory.py` | Main demo: 4 measured tests + comparison table (no LLM needed) |
-| `test_vector_memory.ipynb` | Interactive walkthrough + a real agent choosing between the tools |
-| `memory_stores.py` | The four stores + Titan embedder + self-provisioning (`ensure` pattern) |
+| `test_vector_memory.ipynb` | Interactive walkthrough: key-value limit, FAISS, S3 Vectors, and a real agent choosing between the tools |
+| `test_vector_memory.py` | Script version of the measured tests + comparison table (no LLM needed) |
+| `memory_stores.py` | The stores + Titan embedder + self-provisioning (`ensure` pattern) |
 | `tools.py` | Strands tools: `remember_note`, `recall_by_key`, `recall_semantic` |
 | `requirements.txt` | Dependencies |
 
@@ -133,7 +132,7 @@ client.query_vectors(..., queryVector={"float32": qv}, topK=3,
 
 ### The agent picks the right tool by itself
 
-`recall_by_key`'s docstring says "when the question maps to a known identifier"; `recall_semantic`'s says "when no key is obvious". In Test 4 the agent answers the food question with semantic search and the cabin question with a key lookup, no prompt engineering, just tool context.
+`recall_by_key`'s docstring says "when the question maps to a known identifier"; `recall_semantic`'s says "when no key is obvious". In Test 4 the agent answers the food question with semantic search and the cabin question with a key lookup, no prompt engineering, just tool context. The system prompt states role and conciseness only (`"You are a travel assistant with long-term memory of this user. Be concise: 2-3 sentences maximum."`); each tool's purpose lives in its docstring.
 
 ---
 
@@ -169,7 +168,7 @@ For SaaS memory on S3 Vectors with per-tenant isolation (one index per tenant, I
 | FAISS import error | `uv pip install faiss-cpu` (the wheel ships prebuilt) |
 | Slow first query | First call pays connection/setup cost; the demo warms up before measuring |
 
-**Tested versions:** Strands 1.46.0, faiss-cpu 1.14.3, boto3 1.43.72+, Titan Text Embeddings V2 (1024 dims).
+**Tested versions:** Strands 1.55.1, faiss-cpu 1.14.3, boto3 1.43.72+, Titan Text Embeddings V2 (1024 dims).
 
 ---
 
@@ -191,7 +190,6 @@ This demo compares vector backends, so the cost depends on which one you run. FA
 | Service | Used for | Pricing |
 |---------|----------|---------|
 | Amazon S3 Vectors | Managed vector store (survives restart) | [S3 pricing](https://aws.amazon.com/s3/pricing/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) |
-| Amazon DynamoDB | Vector index inside your operational table | [DynamoDB pricing](https://aws.amazon.com/dynamodb/pricing/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) |
 | Amazon Bedrock (Titan Embeddings V2) | Embedding the memories and the query | [Bedrock pricing](https://aws.amazon.com/bedrock/pricing/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) |
 | OpenAI | Default chat model provider | [OpenAI pricing](https://openai.com/api/pricing/) |
 

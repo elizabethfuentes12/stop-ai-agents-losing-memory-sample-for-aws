@@ -39,19 +39,17 @@ from strands.models.openai import OpenAIModel
 
 import graph_memory as gm
 import travel_tools as tt
+import asyncio
 
-print("Connecting to Neo4j and loading memory...")
-driver, db, embedder = gm.build()
+print("Connecting to Neo4j and building memory (LLM extraction)...")
+driver, db, embedder = asyncio.run(gm.build())
 tt.init_memory(driver=driver, db=db, embedder=embedder)
 
 MODEL = OpenAIModel(model_id="gpt-4o-mini")
 
 agent = Agent(
     model=MODEL,
-    system_prompt=(
-        "You are a personal travel assistant with access to the user's travel memory. "
-        "Always store new facts the user shares. Be concise."
-    ),
+    system_prompt="You are a personal travel assistant. Be concise: at most 3 sentences.",
     tools=[
         tt.search_flights,
         tt.best_time_to_visit,

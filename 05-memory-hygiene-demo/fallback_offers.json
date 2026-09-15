@@ -1,0 +1,209 @@
+{
+ "_captured_on": "2026-09-14",
+ "JFK-MAD": [
+  {
+   "offer_id": "off_0000BAPMoSF2iLgxlbSZXu",
+   "price": 223.87,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "MAD",
+     "segments": [
+      {
+       "carrier": "Duffel Airways",
+       "flight_number": "3678",
+       "departing_at": "2026-10-15T10:50:00",
+       "arriving_at": "2026-10-16T01:05:00",
+       "duration": "PT8H15M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000BAPMoSGobl6rr6HzJ7",
+   "price": 229.33,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "MAD",
+     "segments": [
+      {
+       "carrier": "Iberia",
+       "flight_number": "3167",
+       "departing_at": "2026-10-15T10:50:00",
+       "arriving_at": "2026-10-16T01:05:00",
+       "duration": "PT8H15M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000BAPMoSFkfiG7nnn8eC",
+   "price": 233.68,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "MAD",
+     "segments": [
+      {
+       "carrier": "British Airways",
+       "flight_number": "1516",
+       "departing_at": "2026-10-15T10:50:00",
+       "arriving_at": "2026-10-16T01:05:00",
+       "duration": "PT8H15M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000BAPMoSGobl6rr6HzJ5",
+   "price": 234.39,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "MAD",
+     "segments": [
+      {
+       "carrier": "American Airlines",
+       "flight_number": "1274",
+       "departing_at": "2026-10-15T10:50:00",
+       "arriving_at": "2026-10-16T01:05:00",
+       "duration": "PT8H15M"
+      }
+     ],
+     "stops": 0
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000BAPMoYD8WLjSHQc8PV",
+   "price": 392.6,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "MAD",
+     "segments": [
+      {
+       "carrier": "TAP Air Portugal",
+       "flight_number": "0210",
+       "departing_at": "2026-10-15T22:05:00",
+       "arriving_at": "2026-10-16T10:15:00",
+       "duration": "PT7H10M"
+      },
+      {
+       "carrier": "TAP Air Portugal",
+       "flight_number": "1014",
+       "departing_at": "2026-10-16T13:00:00",
+       "arriving_at": "2026-10-16T15:20:00",
+       "duration": "PT1H20M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000BAPMoYDUV212IWmPxM",
+   "price": 392.6,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "MAD",
+     "segments": [
+      {
+       "carrier": "TAP Air Portugal",
+       "flight_number": "0210",
+       "departing_at": "2026-10-15T22:05:00",
+       "arriving_at": "2026-10-16T10:15:00",
+       "duration": "PT7H10M"
+      },
+      {
+       "carrier": "TAP Air Portugal",
+       "flight_number": "1018",
+       "departing_at": "2026-10-16T16:50:00",
+       "arriving_at": "2026-10-16T19:10:00",
+       "duration": "PT1H20M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000BAPMoYC4aIsiE87HkX",
+   "price": 408.4,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "MAD",
+     "segments": [
+      {
+       "carrier": "Air Serbia",
+       "flight_number": "0501",
+       "departing_at": "2026-10-15T19:30:00",
+       "arriving_at": "2026-10-16T10:20:00",
+       "duration": "PT8H50M"
+      },
+      {
+       "carrier": "Air Serbia",
+       "flight_number": "0572",
+       "departing_at": "2026-10-16T14:25:00",
+       "arriving_at": "2026-10-16T18:00:00",
+       "duration": "PT3H35M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  },
+  {
+   "offer_id": "off_0000BAPMoYC4aIsiE87Hke",
+   "price": 408.4,
+   "currency": "USD",
+   "cabin": "economy",
+   "slices": [
+    {
+     "origin": "JFK",
+     "destination": "MAD",
+     "segments": [
+      {
+       "carrier": "Air Serbia",
+       "flight_number": "0501",
+       "departing_at": "2026-10-15T19:30:00",
+       "arriving_at": "2026-10-16T10:20:00",
+       "duration": "PT8H50M"
+      },
+      {
+       "carrier": "Air Serbia",
+       "flight_number": "0570",
+       "departing_at": "2026-10-17T08:05:00",
+       "arriving_at": "2026-10-17T11:40:00",
+       "duration": "PT3H35M"
+      }
+     ],
+     "stops": 1
+    }
+   ]
+  }
+ ]
+}

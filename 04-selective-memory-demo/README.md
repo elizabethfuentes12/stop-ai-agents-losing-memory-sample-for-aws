@@ -128,7 +128,11 @@ cp .env.example .env   # set OPENAI_API_KEY
 uv venv && uv pip install -r requirements.txt
 ```
 
-### Run Demo
+### Deterministic vs model-based
+
+The control lives in the agent's harness: a native `MemoryManager` over the stores. The selection-recall scoring and the stores are deterministic. The `ModelExtractor` deciding what to keep (its prompt is your policy) and the embeddings are model inference, with no reproducibility guarantee across runs ([research](https://arxiv.org/abs/2601.17768)). The selection policy is text you own; the decision it drives is a model call, so recall varies run to run. The scoring that grades it is deterministic.
+
+## Run Demo
 
 ```bash
 uv run python test_selective_memory.py
@@ -193,7 +197,7 @@ The embedding call dominates end-to-end latency for both, so neither is "faster 
 One `VectorMemoryStore` + one general `ModelExtractor` prompt. The `MemoryManager` runs extraction off the turn (`IntervalTrigger`), stores survivors, and injects recalled memory into the model. The selection prompt is the whole keep/discard policy:
 
 ```python
-GENERAL_SELECTION_PROMPT = (
+SELECTION_PROMPT = (
     "You extract durable memories worth keeping... KEEP durable facts, stated "
     "preferences, notable events. DISCARD small talk, weather, passing opinions. "
     'Return ONLY a JSON array of {"content": string}, or [] if nothing.'
@@ -237,11 +241,11 @@ Wiring up Amazon Bedrock AgentCore Memory through the [official Strands session 
 | `ValidationException` creating the AgentCore memory | The episodic strategy needs `reflectionConfiguration.namespaces`: use the demo's `ensure_memory()` |
 | `ValidationException` deleting a memory | It's still `CREATING`: wait until `ACTIVE` |
 | Extraction never appears (C) | Lag is ~1 min for short conversations; the demo polls up to 7 min. Check the memory is `ACTIVE` |
-| `SearchVectors` not found (DynamoDB backend) | Upgrade to a recent `boto3` that includes the DynamoDB `SearchVectors` API (verified working on 1.43.64) |
+| `SearchVectors` not found (DynamoDB backend) | Upgrade to `boto3>=1.43.72`, the release that added the DynamoDB `SearchVectors` API |
 | Wrong AWS account picked up | `AWS_BEARER_TOKEN*` env vars override profiles; the demo drops them |
 | A or B keeps a decoy / misses a keeper | The `ModelExtractor` system prompt is the policy: tune the selection prompts in `test_selective_memory.py` (or the matching `chat_*.py`) |
 
-**Tested versions:** Strands Agents 1.50.2, boto3 1.43.64 (which already includes the DynamoDB `SearchVectors` API), Titan Text Embeddings V2, AgentCore Memory API (2026).
+**Tested versions:** Strands Agents 1.55.1, boto3 1.43.94 (the DynamoDB `SearchVectors` API needs boto3 ≥ 1.43.72), Titan Text Embeddings V2, AgentCore Memory API (2026).
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Problem:** Semantic memory retrieves by *similarity*, so it finds related pieces but can't connect them. A multi-hop question ("Who do I know that's connected to flights to Spain?") needs the *relationships* between memories, not just their vectors.
 
-**Solution:** Store memories as a knowledge graph. Find an entry point by vector similarity, then **traverse the graph** to the answer.
+**Solution:** Store memories as a knowledge graph, built by an LLM against a pinned schema. Find an entry point by vector similarity, then **traverse the graph** to the answer.
 
 > **Assumed familiarity:** This demo builds on [Demo 01](../01-key-value-memory-demo/) (agent state) and [Demo 02](../02-vector-memory-demo/) (semantic retrieval). It also requires a running Neo4j instance.
 
@@ -11,9 +11,9 @@ Based on research:
 - [MAGMA: A Multi-Graph based Agentic Memory Architecture for AI Agents](https://arxiv.org/abs/2601.03236), Jiang et al., 2026
 - [GRAVITY: Architecture-Agnostic Structured Anchoring for Long-Horizon Conversational Memory](https://arxiv.org/abs/2605.01688), Sun et al., 2026
 
-This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) with [`neo4j-graphrag`](https://neo4j.com/docs/neo4j-graphrag-python/) for graph memory.
+This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) with [`neo4j-graphrag`](https://neo4j.com/docs/neo4j-graphrag-python/) for graph memory. The graph is built by `SimpleKGPipeline`: an LLM reads text and extracts typed entities and relationships against a pinned schema, then merges duplicates. No hand-written `MERGE` statements, no regex triple extractor.
 
-> **Official integration.** This demo wires Neo4j by hand on purpose, to expose the retrieval mechanics (the `VectorRetriever` vs `VectorCypherRetriever` contrast is the whole point). For production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/), that provides a `Neo4jSessionManager` you attach with `Agent(session_manager=...)` to auto-persist turns and inject graph memories. It is a Neo4j Labs package (community-supported), not part of the Strands SDK core, and it hides the low-level retrieval this demo teaches.
+> **Official integration.** This demo wires the two `neo4j-graphrag` retrievers by hand on purpose, to expose the retrieval mechanics (the `VectorRetriever` vs `VectorCypherRetriever` contrast is the whole point). For production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/), that provides a `Neo4jSessionManager` you attach with `Agent(session_manager=...)` to auto-persist turns and inject graph memories. It is a Neo4j Labs package (community-supported), not part of the Strands SDK core, and it hides the low-level retrieval this demo teaches.
 
 ![Graph memory architecture: Strands agent takes two paths. recall_semantic returns pieces (1/4), recall_graph traverses Maya Torres → Iberia → Madrid → Spain (4/4)](images/ai-agent-graph-memory-architecture.png)
 
@@ -23,7 +23,7 @@ This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) fo
 
 ### The scenario: what the agent learned across sessions
 
-Over several conversations, a travel assistant picked up four facts. Stored as a graph, they form a chain:
+Over several conversations, a travel assistant picked up plain-text facts about several people, airlines, and destinations. An LLM extracts them into a graph where, for one traveler, they form a chain:
 
 ```
 (Maya Torres) ──WORKS_AT──▶ (Iberia) ──MEMBER_OF──▶ (Oneworld)
@@ -32,6 +32,8 @@ Over several conversations, a travel assistant picked up four facts. Stored as a
                                   ▼
                               (Madrid) ──IN_COUNTRY──▶ (Spain)
 ```
+
+Other people (Diego Fuentes / Lufthansa / Munich, Priya Nair / Qatar Airways / Doha, Sofia Rossi / ITA Airways / Rome) form parallel chains, so the multi-hop question has one right answer among similar-looking distractors.
 
 **The question:** *"Who do I know that's connected to flights to Spain?"*
 
@@ -43,10 +45,10 @@ The answer, **Maya Torres**, is never stated directly. You can only reach it by 
 
 | Retriever strategy | How it works | Result on the multi-hop question |
 |--------------------|-------------|----------------------------------|
-| **Semantic recall** (`recall_semantic`) | Pure vector similarity | Surfaces `Iberia`, `Madrid`, `Spain` as separate pieces. **Never connects them to Maya.** |
-| **Graph recall** (`recall_graph`) | Similarity → Cypher traversal | Finds an entry node, walks the edges back: **Maya Torres → Iberia → Madrid → Spain.** |
+| **Semantic recall** (`recall_semantic`) | `VectorRetriever`: similarity over chunks | Returns the matching text fragments (`Madrid is in Spain.`, `Maya Torres works at Iberia.`). **Never connects them to a person.** |
+| **Graph recall** (`recall_graph`) | `VectorCypherRetriever`: similarity → Cypher traversal | Matches an entry chunk, walks into the entities extracted from it, and returns the person plus the chain: **Maya Torres → Iberia → Madrid → Spain.** |
 
-Both strategies receive the **same facts** and share the **same vector index**. The graph wins because it stores memories as *connected nodes*, not because it's handed the answer. The advantage is structural.
+Both strategies receive the **same text** and share the **same chunk vector index**. The graph wins because the LLM extracted *connected entities* from the text, not because it's handed the answer. The advantage is structural.
 
 ![Multi-hop question over agent memory: vector similarity surfaces Iberia, Madrid and Spain as disconnected pieces; graph traversal walks the edges back to Maya Torres](images/ai-agent-multihop-vector-vs-graph.png)
 
@@ -56,9 +58,9 @@ Both strategies receive the **same facts** and share the **same vector index**. 
 
 | Test | What it does | Recovers the multi-hop answer? |
 |------|--------------|-------------------------------|
-| **1. Agent: semantic recall only** | Agent with `recall_semantic`: pure similarity, no traversal | No |
+| **1. Agent: semantic recall only** | Agent with `recall_semantic`: similarity over chunks, no traversal | No |
 | **2. Agent: graph recall** | Agent with `recall_graph`: similarity + graph traversal | Yes |
-| **3. Full travel agent** | Agent with all 6 tools: searches flights, books (writes to graph), recalls, remembers | Yes |
+| **3. Full travel agent** | Agent with all 6 tools: searches flights, books, recalls, and grows the graph via `remember_fact` | Yes |
 | **4. Deterministic scorecard** | 4 multi-hop questions, semantic vs graph, checked against the known graph | semantic **1/4**, graph **4/4** |
 
 The scorecard is a deterministic check against the known graph (**not** an LLM judge), so the numbers are reproducible.
@@ -72,7 +74,7 @@ Plugging an external graph store into a full travel agent is *just tools + state
 ```python
 agent = Agent(
     model=MODEL,
-    system_prompt="You are a personal travel assistant with access to the user's travel memory. ...",
+    system_prompt="You are a personal travel assistant. Be concise: at most 3 sentences.",
     tools=[
         # Travel tools: what the assistant does
         search_flights, book_flight, best_time_to_visit,
@@ -82,9 +84,9 @@ agent = Agent(
 )
 ```
 
-`book_flight` is graph-aware: when the user books a flight, it writes the airline and destination as edges into the graph (`User -[BOOKED_WITH]-> Iberia`, `User -[TRAVELED_TO]-> MAD`), so the knowledge graph grows with the user's travel history.
+`remember_fact` is the write path: it passes one plain-English sentence to the same `SimpleKGPipeline`, so a new fact is extracted into graph nodes and edges the same way the graph was first built, then answerable by traversal.
 
-`recall_graph` and `recall_semantic` are thin wrappers over the two `neo4j-graphrag` retriever classes, so no custom retrieval code is needed.
+`recall_graph` and `recall_semantic` are thin wrappers over the two `neo4j-graphrag` retriever classes (`VectorCypherRetriever` and `VectorRetriever`), so no custom retrieval code is needed. The system prompt is role-only; each tool's purpose lives in its docstring.
 
 ---
 
@@ -112,10 +114,18 @@ uv venv && uv pip install -r requirements.txt
 cp .env.example .env   # fill in OPENAI_API_KEY and NEO4J_* values
 ```
 
-### Run Demo
+### Deterministic vs model-based
+
+The control lives in the agent's harness: retrievers and the extraction pipeline are tools the agent calls. Building the graph with `SimpleKGPipeline` and the embeddings are model inference; the cosine similarity and the Cypher traversal are deterministic. Pinning the schema and extracting at `temperature=0` make construction reproducible enough for the scorecard, but a model call carries no such guarantee ([research](https://arxiv.org/abs/2601.17768)). Once the graph exists, the 1/4 vs 4/4 contrast is deterministic.
+
+## Run Demo
 
 ```bash
 uv run python test_graph_memory.py
+
+# Interactive chat (graph recall, or semantic-only for contrast)
+uv run python chat_graph.py
+uv run python chat_semantic.py
 
 # Interactive notebook
 # Open test_graph_memory.ipynb in Jupyter, JupyterLab, or VS Code
@@ -129,8 +139,10 @@ uv run python test_graph_memory.py
 |------|---------|
 | `test_graph_memory.py` | Main demo: 4 agent tests + scorecard comparison table |
 | `test_graph_memory.ipynb` | Interactive notebook walkthrough |
-| `graph_memory.py` | Graph memory layer: Neo4j connection, seed graph, vector index, `make_semantic_retriever`, `make_graph_retriever` |
-| `travel_tools.py` | Strands `@tool`s. **Travel:** `search_flights`, `book_flight`, `best_time_to_visit` · **Memory:** `remember_fact`, `recall_semantic`, `recall_graph` |
+| `graph_memory.py` | Graph memory layer: Neo4j connection, isolated `memorydemo` database, `SimpleKGPipeline` (LLM extraction) against the pinned schema, chunk vector index, `make_semantic_retriever`, `make_graph_retriever` |
+| `travel_tools.py` | Strands `@tool`s. **Travel:** `search_flights`, `book_flight`, `best_time_to_visit` · **Memory:** `remember_fact` (feeds the extraction pipeline), `recall_semantic`, `recall_graph` |
+| `chat_graph.py` | Interactive CLI with graph recall (`recall_graph` + all tools) |
+| `chat_semantic.py` | Interactive CLI with semantic recall only (`recall_semantic`) |
 | `flights_api.py` | Duffel sandbox flight search with offline fallback |
 | `weather_api.py` | Open-Meteo historical climate data |
 | `fallback_offers.json` | Captured real offers for offline resilience |
@@ -141,15 +153,31 @@ uv run python test_graph_memory.py
 
 ## How It Works
 
-### 1. Seed a known graph with real embeddings
+### 1. Let an LLM build the graph from text
 
-Facts are written as `MERGE` statements (idempotent, so rerunning never duplicates). Each node gets a real OpenAI embedding (`text-embedding-3-small`), computed once at write time: the production pattern.
+The memories are plain sentences (`"Maya Torres works at Iberia."`, `"Madrid is in Spain."`). `SimpleKGPipeline` reads them, an LLM extracts typed entities and relationships against a pinned schema, and duplicate entities are merged (one `Iberia`, not one per mention). The pipeline writes a lexical graph (`Document → Chunk → extracted entities`) and embeds each `Chunk` with OpenAI `text-embedding-3-small`. No hand-written `MERGE`, no regex.
 
-### 2. Create a native Neo4j vector index
+```python
+GRAPH_SCHEMA = {
+    "node_types": [{"label": "Person", ...}, {"label": "Airline", ...},
+                   {"label": "Alliance", ...}, {"label": "City", ...}, {"label": "Country", ...}],
+    "relationship_types": [{"label": "WORKS_AT"}, {"label": "MEMBER_OF"},
+                           {"label": "FLIES_TO"}, {"label": "IN_COUNTRY"}],
+    "patterns": [("Person", "WORKS_AT", "Airline"), ("Airline", "MEMBER_OF", "Alliance"),
+                 ("Airline", "FLIES_TO", "City"), ("City", "IN_COUNTRY", "Country")],
+    "additional_node_types": False,        # refuse anything outside the contract,
+    "additional_relationship_types": False,  # so the traversal below can rely on the labels
+    "additional_patterns": False,
+}
+```
+
+### 2. Create a native Neo4j vector index over the chunks
+
+`SimpleKGPipeline` embeds the `Chunk` nodes but does not create the index, so the demo creates it explicitly over `Chunk.embedding`:
 
 ```python
 from neo4j_graphrag.indexes import create_vector_index
-create_vector_index(driver, "memory_embeddings", label="Memory",
+create_vector_index(driver, "chunk_embeddings", label="Chunk",
                     embedding_property="embedding", dimensions=1536,
                     similarity_fn="cosine", neo4j_database=db)
 ```
@@ -159,31 +187,40 @@ create_vector_index(driver, "memory_embeddings", label="Memory",
 ```python
 from neo4j_graphrag.retrievers import VectorRetriever, VectorCypherRetriever
 
-# recall_semantic: pure similarity, returns the most similar nodes
-semantic_retriever = VectorRetriever(driver, "memory_embeddings", embedder=embedder, ...)
+# recall_semantic: similarity over chunks, returns the matching text fragments only
+semantic_retriever = VectorRetriever(driver, "chunk_embeddings", embedder=embedder,
+                                     return_properties=["text"], neo4j_database=db)
 
-# recall_graph: similarity → traversal. The retrieval_query receives `node` + `score`
-# from the vector index, then walks the graph back to the person.
+# recall_graph: similarity → traversal. From the matched Chunk, step into the entities
+# extracted from it (FROM_CHUNK), find a Person, and return the shortest path.
 RETRIEVAL_QUERY = """
-WITH node AS entry, score
-MATCH (person:Person) WHERE person <> entry
-MATCH path = shortestPath((person)-[*1..5]-(entry))
-RETURN person.name AS who, [n IN nodes(path) | n.name] AS chain, max(score) AS score
+WITH node AS chunk, score
+MATCH (chunk)<-[:FROM_CHUNK]-(entity)
+MATCH (person:Person) WHERE person <> entity
+MATCH path = shortestPath((person)-[:WORKS_AT|MEMBER_OF|FLIES_TO|IN_COUNTRY*1..5]-(entity))
+RETURN DISTINCT person.name AS who,
+       [n IN nodes(path) | coalesce(n.name, head(labels(n)))] AS chain,
+       max(score) AS score
 ORDER BY score DESC
+LIMIT 5
 """
-graph_retriever = VectorCypherRetriever(driver, "memory_embeddings", RETRIEVAL_QUERY, embedder=embedder, ...)
+graph_retriever = VectorCypherRetriever(driver, "chunk_embeddings", RETRIEVAL_QUERY,
+                                        embedder=embedder, neo4j_database=db)
 ```
 
 This "vector search then expand through the graph" is the documented graph-RAG pattern.
 
-### 4. book_flight writes to the graph
+### 4. remember_fact grows the graph through the same pipeline
 
-When the agent books a flight, `book_flight` uses the same Neo4j session to add edges for what was learned, so the knowledge graph grows with usage:
+New facts are not written with hand-built Cypher. `remember_fact` passes the sentence to the same `SimpleKGPipeline`, so the LLM extracts it against the pinned schema and the chunk index is refreshed, exactly how the graph was first built:
 
 ```python
-# User booked an Iberia flight to MAD:
-session.run("MERGE (a:Memory {name: 'User'}) MERGE (b:Memory {name: 'Iberia'}) MERGE (a)-[:BOOKED_WITH]->(b)")
-session.run("MERGE (a:Memory {name: 'User'}) MERGE (b:Memory {name: 'MAD'})    MERGE (a)-[:TRAVELED_TO]->(b)")
+@tool
+def remember_fact(sentence: str) -> str:
+    pipeline = gm.build_pipeline(driver, db, embedder=embedder)
+    _run_async(pipeline.run_async(text=sentence))   # LLM extraction, same schema
+    create_vector_index(driver, gm.VECTOR_INDEX_NAME, label=gm.CHUNK_LABEL, ...)
+    return f"Extracted and stored into the graph: {sentence!r}"
 ```
 
 ---
@@ -202,22 +239,22 @@ session.run("MERGE (a:Memory {name: 'User'}) MERGE (b:Memory {name: 'MAD'})    M
 
 | Component | Demo | Production |
 |-----------|------|------------|
-| Graph construction | Seeded known facts (`MERGE`), reproducible | LLM entity extraction (`SimpleKGPipeline`) from raw text |
-| Embeddings | OpenAI `text-embedding-3-small` (real) | Same, or Amazon Titan via Bedrock (production demo) |
-| Index | Neo4j native vector index | Same, plus fulltext / hybrid retrievers |
-| Traversal | Fixed shortest-path Cypher | Learned or templated multi-hop queries |
+| Graph construction | LLM entity extraction (`SimpleKGPipeline`) from plain text, pinned schema | Same, over larger and messier corpora |
+| Embeddings | OpenAI `text-embedding-3-small` (real), on the chunks | Same, or Amazon Titan via Bedrock |
+| Index | Neo4j native vector index over `Chunk.embedding` | Same, plus fulltext / hybrid retrievers |
+| Traversal | Fixed shortest-path Cypher in `VectorCypherRetriever` | Learned or templated multi-hop queries |
 
-`SimpleKGPipeline` (LLM-extracted graphs) is powerful but non-deterministic, so this teaching demo seeds a fixed graph to keep the before/after scores reproducible.
+The demo already uses the production graph-construction pattern (`SimpleKGPipeline`). To keep the before/after scorecard stable, the extraction LLM runs at `temperature=0` and the schema is pinned with `additional_*: False`, so the same sentences yield the same graph run to run.
 
 ---
 
 ## Learning Objectives
 
 1. Understand why similarity-only memory fails on multi-hop questions
-2. Model agent memory as a knowledge graph (nodes, typed edges, embeddings)
-3. Contrast `recall_semantic` vs `recall_graph` on the same facts via agentic tests
+2. Let an LLM model agent memory as a knowledge graph (typed nodes, edges, chunk embeddings) with `SimpleKGPipeline` and a pinned schema
+3. Contrast `recall_semantic` vs `recall_graph` on the same text via agentic tests
 4. Plug an external graph store into a full Strands travel agent with just tools + state
-5. Have `book_flight` grow the graph automatically from user actions
+5. Have `remember_fact` grow the graph through the same extraction pipeline that built it
 
 ---
 
@@ -231,7 +268,7 @@ session.run("MERGE (a:Memory {name: 'User'}) MERGE (b:Memory {name: 'MAD'})    M
 | Can't create database `memorydemo` | Expected on Neo4j Community (single database). The demo falls back to the default database automatically. |
 | `OPENAI_API_KEY` errors | Both the chat model and the embeddings need it. Set it in `.env`, or switch to the Bedrock/Titan block. |
 
-### ⚠️ A real API-churn note (why the `SEARCH` clause matters)
+### An API-churn note (why the `SEARCH` clause matters)
 
 `neo4j-graphrag` 1.18.0 emits the newer `SEARCH ... IN (VECTOR INDEX ...)` Cypher clause on Neo4j **2026.01+**. That clause is only parsed under **Cypher 25**, but current Neo4j servers still default to **Cypher 5**. This demo handles it the supported way: it creates its database *already in Cypher 25*, atomically:
 
@@ -241,7 +278,7 @@ CREATE DATABASE memorydemo IF NOT EXISTS DEFAULT LANGUAGE CYPHER 25
 
 Gated on the library's own `supports_search_clause` (no `neo4j.conf` edit and no server restart needed). On Neo4j **5.x** the retrievers use the classic `db.index.vector.queryNodes` procedure and no language change is needed.
 
-**Tested versions:** Strands 1.46.0, `neo4j-graphrag` 1.18.0, `neo4j` driver 6.2.0, Neo4j server 2026.01.3 Enterprise.
+**Tested versions:** Strands 1.55.1, `neo4j-graphrag` 1.18.0, `neo4j` driver 6.2.0, Neo4j server 2026.x Enterprise.
 
 ---
 

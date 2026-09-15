@@ -38,21 +38,20 @@ from strands import Agent
 # Using OpenAI-compatible interface via Strands SDK (not direct OpenAI usage)
 from strands.models.openai import OpenAIModel
 
+import asyncio
+
 import graph_memory as gm
 import travel_tools as tt
 
-print("Connecting to Neo4j and loading memory...")
-driver, db, embedder = gm.build()
+print("Connecting to Neo4j and building memory (LLM extraction)...")
+driver, db, embedder = asyncio.run(gm.build())
 tt.init_memory(driver=driver, db=db, embedder=embedder)
 
 MODEL = OpenAIModel(model_id="gpt-4o-mini")
 
 agent = Agent(
     model=MODEL,
-    system_prompt=(
-        "You are a personal travel assistant with access to the user's travel memory. "
-        "Always store new facts the user shares. Be concise."
-    ),
+    system_prompt="You are a personal travel assistant. Be concise: at most 3 sentences.",
     tools=[
         tt.search_flights,
         tt.book_flight,
@@ -73,15 +72,18 @@ print(__doc__)
 
 
 def _show_graph():
-    """Print all nodes and edges currently in the graph."""
+    """Print the entities and edges the LLM pipeline extracted into the graph."""
     with driver.session(database=db) as session:
-        nodes = session.run(f"MATCH (n:{gm.NODE_LABEL}) RETURN n.name AS name, n.type AS type ORDER BY n.type, n.name").data()
+        nodes = session.run(
+            "MATCH (n:__Entity__) RETURN n.name AS name, head(labels(n)) AS type "
+            "ORDER BY type, name"
+        ).data()
         edges = session.run(
-            f"MATCH (a:{gm.NODE_LABEL})-[r]->(b:{gm.NODE_LABEL}) "
-            f"RETURN a.name AS src, type(r) AS rel, b.name AS dst ORDER BY a.name"
+            "MATCH (a:__Entity__)-[r]->(b:__Entity__) "
+            "RETURN a.name AS src, type(r) AS rel, b.name AS dst ORDER BY a.name"
         ).data()
 
-    print(f"\nGraph, {len(nodes)} nodes, {len(edges)} edges:")
+    print(f"\nGraph, {len(nodes)} entities, {len(edges)} edges:")
     for e in edges:
         print(f"  ({e['src']}) -[{e['rel']}]-> ({e['dst']})")
     if not edges:

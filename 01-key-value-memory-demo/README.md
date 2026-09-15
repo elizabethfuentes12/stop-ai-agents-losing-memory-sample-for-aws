@@ -8,7 +8,7 @@ Based on research:
 - [MemoryOS of AI Agent](https://arxiv.org/abs/2506.06326) (Kang et al., 2025)
 - [Cognitive Memory in Large Language Models](https://arxiv.org/abs/2504.02441) (Shan et al., 2025)
 
-This demo implements memory patterns using [Strands Agents SDK](https://github.com/strands-agents/sdk-python).
+This demo implements memory patterns using the [Strands Agents SDK](https://github.com/strands-agents/sdk-python) (1.55.1). Memory lives entirely in the agent harness (`agent.state` plus a session manager); there is no external memory service. The system prompt states role and conciseness only; each tool's purpose lives in its own docstring.
 
 ---
 
@@ -121,7 +121,11 @@ uv pip install -r requirements.txt
 uv venv; uv pip install -r requirements.txt
 ```
 
-### Run Demo
+### Deterministic vs model-based
+
+The control lives in the agent's harness: `agent.state` plus a session manager, both native to Strands. Writing the profile, ranking offers with a scoring function, and persisting through `FileSessionManager` / `S3SessionManager` are deterministic code. The model-based part is the agent choosing a tool and wording the reply; a model call carries no reproducibility guarantee across runs ([research](https://arxiv.org/abs/2601.17768)). What the demo measures (a structured profile that survives a restart) is deterministic.
+
+## Run Demo
 
 ```bash
 # Run all 4 tests with comparison table

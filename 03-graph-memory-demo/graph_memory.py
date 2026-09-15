@@ -1,38 +1,30 @@
-"""Graph memory layer for the graph-memory demo.
+"""Graph memory built by an LLM, not by hand.
 
-Semantic memory (Demo 02) retrieves by *similarity* but cannot reason over
-*relationships*. A multi-hop question, "Who do I know that's connected to
-flights to Spain?", needs a different move: find an entry point by
-vector similarity, then **traverse the graph** to the answer.
+Semantic memory (Demo 02) retrieves by similarity but cannot reason over
+relationships. A multi-hop question — "Who do I know connected to flights to
+Spain?" — needs to find an entry point by similarity, then traverse the graph.
 
-This module builds a small knowledge graph of what the agent has learned across
-sessions and exposes the two retrieval strategies the demo contrasts:
+This module builds that graph the way Neo4j builds knowledge graphs in
+production: `SimpleKGPipeline` reads text and an LLM extracts entities and
+relationships against a pinned schema, then merges duplicates (entity
+resolution). No hand-written MERGE statements, no regex triple extractor. The
+same pipeline the neo4j-graphrag docs and the AWS GraphRAG workshop use.
 
-  - Before: ``VectorRetriever``, pure vector similarity. Returns the individually
-    most-similar memory nodes. It surfaces "Iberia", "Madrid", "Spain" as separate
-    pieces but never connects them to the person, because similarity has no notion
-    of a relationship.
-  - After: ``VectorCypherRetriever``, vector similarity to find an entry node, then
-    a Cypher traversal that walks the relationships back to the person. It answers
-    "Maya Torres" and returns the path Maya -> Iberia -> Madrid -> Spain.
+The pipeline writes a lexical graph (Document -> Chunk -> extracted entities)
+and embeds the chunks. Retrieval matches a chunk by vector similarity, then
+walks FROM_CHUNK into the extracted entities and across their relationships.
 
-Both strategies receive the SAME facts. The graph wins because it stores them as
-connected nodes, not because it is given the answer, the advantage is structural.
+Two retrieval strategies the demo contrasts:
+  - VectorRetriever: similarity over chunks only. Surfaces text, no traversal.
+  - VectorCypherRetriever: similarity to an entry chunk, then a Cypher traversal
+    to the connected Person and the chain that links them.
 
-The graph is a *known*, seeded graph (explicit MERGE statements), so the demo is
-reproducible run to run. A production system would extract entities from natural
-language with an LLM (see ``neo4j_graphrag.experimental.pipeline.SimpleKGPipeline``);
-that is powerful but non-deterministic, which is why the teaching demo seeds a fixed
-graph and the README shows the pipeline as an optional upgrade.
+Both receive the same text and share the same vector index. The graph wins
+because it stores connected entities, not because it is handed the answer.
 
-Research on graph-structured agent memory:
-  https://arxiv.org/abs/2603.27910 (GAAMA, Graph Augmented Associative Memory for Agents)
-  https://arxiv.org/abs/2601.03236 (MAGMA, Multi-Graph based Agentic Memory Architecture)
-  https://arxiv.org/abs/2605.01688 (GRAVITY, structured anchoring for long-horizon memory)
-
-Neo4j facts used here are from the official Neo4j docs: native vector index
-(``CREATE VECTOR INDEX``, cosine, dims 1-4096) and the documented "vector search then
-expand through the graph" pattern implemented by ``VectorCypherRetriever``.
+Neo4j facts used here (verified against neo4j-graphrag 1.18.0): SimpleKGPipeline
+embeds Chunk nodes (not entities) and does not create the vector index itself,
+so the index is created explicitly over Chunk.embedding.
 """
 
 import os
@@ -42,176 +34,165 @@ import time
 
 from dotenv import load_dotenv
 
-# Load .env before reading any config below, so env vars are available regardless of
-# which module imports this one first.
 load_dotenv()
 
 from neo4j import GraphDatabase
 from neo4j_graphrag.embeddings import OpenAIEmbeddings
+from neo4j_graphrag.llm import OpenAILLM
 from neo4j_graphrag.indexes import create_vector_index, drop_index_if_exists
 from neo4j_graphrag.retrievers import VectorRetriever, VectorCypherRetriever
 from neo4j_graphrag.utils.version_utils import supports_search_clause
+from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
+from neo4j_graphrag.experimental.components.text_splitters.fixed_size_splitter import (
+    FixedSizeSplitter,
+)
 
 # ── Connection config (from env / .env) ──────────────────────────────────────
 NEO4J_URI = os.getenv("NEO4J_URI", "neo4j://127.0.0.1:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 
-# The demo uses its OWN isolated database so it never touches other graphs on the
-# same server. On Neo4j Community (single database) this falls back to the default
-# database automatically, see ensure_database().
 NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "memorydemo")
 DEFAULT_DATABASE = os.getenv("NEO4J_DEFAULT_DATABASE", "neo4j")
 
-# ── Vector index / embedding config ──────────────────────────────────────────
+# ── Model / index config ─────────────────────────────────────────────────────
 EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
-EMBED_DIM = 1536              # dimensions of text-embedding-3-small
-VECTOR_INDEX_NAME = "memory_embeddings"
-NODE_LABEL = "Memory"         # every memory node carries this label; the index is on it
+EMBED_DIM = 1536
+CHAT_MODEL = os.getenv("GRAPH_CHAT_MODEL", "gpt-4o-mini")
+VECTOR_INDEX_NAME = "chunk_embeddings"
+CHUNK_LABEL = "Chunk"
 
-# ── The seeded memory graph (a KNOWN graph → reproducible) ───────────────────
-# What the agent remembered in PREVIOUS sessions (via remember_fact, Test 3 shows
-# the live write path), replayed here as explicit triples so the before/after
-# measurement is deterministic. These are the SAME facts the flat/semantic memory
-# in the "before" case receives.
-FACTS = [
-    ("Maya Torres", "WORKS_AT",   "Iberia"),
-    ("Iberia",      "MEMBER_OF",  "Oneworld"),
-    ("Iberia",      "FLIES_TO",   "Madrid"),
-    ("Madrid",      "IN_COUNTRY", "Spain"),
-]
-
-# A secondary type label per node, so a traversal can ask for "a Person connected
-# to the matched entry" instead of hard-coding a relationship name.
-NODE_TYPES = {
-    "Maya Torres": "Person",
-    "Iberia":      "Airline",
-    "Oneworld":    "Alliance",
-    "Madrid":      "Location",
-    "Spain":       "Country",
+# ── The pinned extraction schema ─────────────────────────────────────────────
+# Without a pinned schema, SimpleKGPipeline lets the LLM invent labels per chunk
+# and the traversal below can't rely on them. additional_*: False refuses
+# anything outside this contract, the same discipline the AWS GraphRAG workshop
+# uses for its hotel schema.
+GRAPH_SCHEMA = {
+    "node_types": [
+        {"label": "Person", "description": "A person the traveler knows.",
+         "properties": [{"name": "name", "type": "STRING"}]},
+        {"label": "Airline", "description": "An airline.",
+         "properties": [{"name": "name", "type": "STRING"}]},
+        {"label": "Alliance", "description": "An airline alliance, e.g. Oneworld.",
+         "properties": [{"name": "name", "type": "STRING"}]},
+        {"label": "City", "description": "A city.",
+         "properties": [{"name": "name", "type": "STRING"}]},
+        {"label": "Country", "description": "A country.",
+         "properties": [{"name": "name", "type": "STRING"}]},
+    ],
+    "relationship_types": [
+        {"label": "WORKS_AT"}, {"label": "MEMBER_OF"},
+        {"label": "FLIES_TO"}, {"label": "IN_COUNTRY"},
+    ],
+    "patterns": [
+        ("Person", "WORKS_AT", "Airline"),
+        ("Airline", "MEMBER_OF", "Alliance"),
+        ("Airline", "FLIES_TO", "City"),
+        ("City", "IN_COUNTRY", "Country"),
+    ],
+    "additional_node_types": False,
+    "additional_relationship_types": False,
+    "additional_patterns": False,
 }
 
-# The text we embed for each node. Deliberately NEUTRAL: it does not echo the
-# query wording ("who do I know"), so pure vector similarity genuinely cannot
-# identify the person, only the graph traversal can. This keeps the contrast honest.
-NODE_TEXT = {
-    "Maya Torres": "Maya Torres. A contact name.",
-    "Iberia":      "Iberia. An airline.",
-    "Oneworld":    "Oneworld. An airline alliance.",
-    "Madrid":      "Madrid. A city.",
-    "Spain":       "Spain. A country.",
-}
+# What the traveler told the agent across past sessions, as plain text. The LLM
+# turns this into the graph; nothing here names a node label or an edge type.
+# Several people and airlines are present so the multi-hop question has one right
+# answer among similar-looking distractors. That is where the graph pulls ahead:
+# similarity over the text finds related sentences, but only a traversal follows
+# the chain Person -> Airline -> Alliance/City -> Country to the correct person.
+CONVERSATION_TEXT = (
+    "Maya Torres works at Iberia. "
+    "Iberia is a member of the Oneworld alliance. "
+    "Iberia flies to Madrid. "
+    "Madrid is in Spain. "
+    "Diego Fuentes works at Lufthansa. "
+    "Lufthansa is a member of the Star Alliance. "
+    "Lufthansa flies to Munich. "
+    "Munich is in Germany. "
+    "Priya Nair works at Qatar Airways. "
+    "Qatar Airways is a member of the Oneworld alliance. "
+    "Qatar Airways flies to Doha. "
+    "Doha is in Qatar. "
+    "Sofia Rossi works at ITA Airways. "
+    "ITA Airways flies to Rome. "
+    "Rome is in Italy."
+)
 
-# Allow-lists: relation types and node-type labels are interpolated into Cypher
-# (Cypher cannot parameterize a relationship type or a label), so we validate them
-# against these fixed sets to keep the interpolation safe.
-ALLOWED_RELATIONS = {
-    "WORKS_AT", "MEMBER_OF", "FLIES_TO", "IN_COUNTRY",  # structural (seeded graph)
-    "BOOKED_WITH", "PREFERS_CABIN", "TRAVELED_TO",       # learned from bookings
-}
-ALLOWED_TYPES = {"Person", "Airline", "Alliance", "Location", "Country"}
-
-# The traversal that makes the "after" case work: the vector index hands us an
-# entry node (via `node` + `score`); we then find a Person and the shortest path
-# from that Person to the entry, and return the person plus the full chain.
+# Traversal for the "after" case: from the vector-matched Chunk, step into the
+# entities extracted from it (FROM_CHUNK), find a Person, and return the shortest
+# path from that Person to any entity on the matched chunk.
 RETRIEVAL_QUERY = """
-WITH node AS entry, score
+WITH node AS chunk, score
+MATCH (chunk)<-[:FROM_CHUNK]-(entity)
 MATCH (person:Person)
-WHERE person <> entry
-MATCH path = shortestPath((person)-[*1..5]-(entry))
-RETURN person.name AS who,
-       [n IN nodes(path) | n.name] AS chain,
+WHERE person <> entity
+MATCH path = shortestPath((person)-[:WORKS_AT|MEMBER_OF|FLIES_TO|IN_COUNTRY*1..5]-(entity))
+RETURN DISTINCT person.name AS who,
+       [n IN nodes(path) | coalesce(n.name, head(labels(n)))] AS chain,
        max(score) AS score
 ORDER BY score DESC
+LIMIT 5
 """
 
 
 def _valid_identifier(name: str) -> bool:
-    """A conservative check for names we interpolate into Cypher (DB names)."""
     return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name))
 
 
-def get_driver() -> "GraphDatabase.driver":
-    """Create a Neo4j driver from the env config and verify connectivity."""
+def get_driver():
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
     driver.verify_connectivity()
     return driver
 
 
 def get_embedder() -> OpenAIEmbeddings:
-    """Real OpenAI embeddings (text-embedding-3-small), same model as Demo 02.
-
-    To use Amazon Bedrock (Amazon Titan) embeddings instead, see the commented
-    block in the README, swap this for a Bedrock embedder in the production demo.
-    """
+    """OpenAI embeddings (text-embedding-3-small), the same model as Demo 02."""
     return OpenAIEmbeddings(model=EMBED_MODEL)
 
 
+def get_llm() -> OpenAILLM:
+    """The LLM the pipeline uses to extract entities and relationships.
+
+    temperature=0 keeps extraction stable run to run. To use Amazon Bedrock,
+    swap this for neo4j_graphrag.llm.BedrockLLM.
+    """
+    return OpenAILLM(model_name=CHAT_MODEL, model_params={"temperature": 0})
+
+
 def ensure_database(driver) -> str:
-    """Create the demo's isolated database in the right Cypher language, and return its name.
+    """Create the demo's isolated database in the right Cypher language; return its name.
 
-    Two things this demo needs on the target server:
-
-    1. An isolated database, so it never touches other graphs on the same server.
-
-    2. The right Cypher language. On the current Neo4j (2026.x) the server defaults to
-       Cypher 5, but the ``neo4j-graphrag`` retriever classes emit the newer
-       ``SEARCH ... IN (VECTOR INDEX ...)`` clause, which only parses under **Cypher 25**.
-       So the retrievers fail with ``Invalid input 'SEARCH'`` on a Cypher-5 database.
-
-       The correct, supported fix is to give the database Cypher 25 as its own default
-       language, set atomically when the database is created:
-
-           CREATE DATABASE memorydemo IF NOT EXISTS DEFAULT LANGUAGE CYPHER 25
-
-       This is the mechanism Neo4j documents for per-database language (no ``neo4j.conf``
-       edit, no server restart). We gate the language clause on the library's own
-       ``supports_search_clause`` so it stays in sync with what the retrievers actually
-       emit, on Neo4j 5.x they use the classic ``db.index.vector.queryNodes`` procedure,
-       which needs no language change, so we create a plain database there.
-
-    On Neo4j Community (single database, no ``CREATE``/``ALTER DATABASE``) this falls back
-    to the default database; see the printed guidance if the SEARCH clause is needed there.
+    On Neo4j 2026.x the vector retrievers emit the Cypher 25 `SEARCH` clause, so
+    the database is created with `DEFAULT LANGUAGE CYPHER 25`. On Community
+    (single database) this falls back to the default database.
     """
     if not _valid_identifier(NEO4J_DATABASE):
         raise ValueError(f"Invalid NEO4J_DATABASE name: {NEO4J_DATABASE!r}")
 
-    # Server-version decision (independent of any database's language). "system" always exists.
     needs_cypher_25 = supports_search_clause(driver, "system")
     language_clause = " DEFAULT LANGUAGE CYPHER 25" if needs_cypher_25 else ""
 
     db = NEO4J_DATABASE
     try:
         with driver.session(database="system") as session:
-            # Born in the right language, in one atomic statement.
             session.run(f"CREATE DATABASE {db} IF NOT EXISTS{language_clause}")
-            # IF NOT EXISTS leaves a pre-existing database untouched, so also align the
-            # language on a database created by an earlier run (idempotent no-op otherwise).
             if needs_cypher_25:
                 session.run(f"ALTER DATABASE {db} SET DEFAULT LANGUAGE CYPHER 25")
         _wait_for_database_online(driver, db)
         if needs_cypher_25:
-            print(f"  ✅ Database '{db}' uses Cypher 25 (required by the vector retrievers on this server).")
+            print(f"  Database '{db}' created in Cypher 25 (required by the vector retrievers on this server).")
         return db
     except Exception as exc:
-        # Community edition (or restricted permissions): can't create/alter databases.
-        # Fall back to the default database, the demo still runs, but it shares a database.
         db = DEFAULT_DATABASE
         print(
-            f"  ⚠️  Could not create database '{NEO4J_DATABASE}' ({str(exc).splitlines()[0][:80]}).\n"
+            f"  Could not create database '{NEO4J_DATABASE}' ({str(exc).splitlines()[0][:80]}).\n"
             f"      Falling back to the default database '{db}'. On Neo4j Community this is expected."
         )
-        if needs_cypher_25:
-            print(
-                f"      This server needs Cypher 25 for the vector retrievers, but Community can't set it\n"
-                f"      per database. If they fail with \"Invalid input 'SEARCH'\", set\n"
-                f"      db.query.default_language=CYPHER_25 in neo4j.conf and restart the server."
-            )
         return db
 
 
 def _wait_for_database_online(driver, db: str, timeout_s: float = 30.0) -> None:
-    """Block until the given database reports currentStatus 'online'."""
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         with driver.session(database="system") as session:
@@ -223,68 +204,7 @@ def _wait_for_database_online(driver, db: str, timeout_s: float = 30.0) -> None:
         threading.Event().wait(0.5)
 
 
-def reset_graph(driver, db: str) -> None:
-    """Remove this demo's nodes and vector index so a rerun starts clean.
-
-    Scoped to :Memory nodes and this demo's index only, it never runs a blanket
-    'delete everything', so it is safe even if the demo shares a database.
-    """
-    drop_index_if_exists(driver, VECTOR_INDEX_NAME, neo4j_database=db)
-    with driver.session(database=db) as session:
-        session.run(f"MATCH (n:{NODE_LABEL}) DETACH DELETE n")
-
-
-def seed_graph(driver, db: str, embedder: OpenAIEmbeddings) -> dict:
-    """Seed the known memory graph: nodes + real embeddings, relationships, vector index.
-
-    Returns a small summary dict (node/relationship/index counts) for the test output.
-    """
-    # 1) Nodes: each memory node gets its neutral text, a type label, and a real embedding.
-    #    The embedding is computed once here (write time), the production pattern, and the
-    #    reason the query path only has to embed the query itself.
-    with driver.session(database=db) as session:
-        for name, node_type in NODE_TYPES.items():
-            if node_type not in ALLOWED_TYPES:
-                raise ValueError(f"Unexpected node type: {node_type!r}")
-            vector = embedder.embed_query(NODE_TEXT[name])
-            session.run(
-                f"MERGE (m:{NODE_LABEL} {{name: $name}}) "
-                f"SET m.text = $text, m.type = $type, m:`{node_type}`, m.embedding = $vector",
-                name=name, text=NODE_TEXT[name], type=node_type, vector=vector,
-            )
-
-        # 2) Relationships: the edges that make multi-hop traversal possible.
-        for subject, relation, obj in FACTS:
-            if relation not in ALLOWED_RELATIONS:
-                raise ValueError(f"Unexpected relation: {relation!r}")
-            session.run(
-                f"MATCH (a:{NODE_LABEL} {{name: $s}}), (b:{NODE_LABEL} {{name: $o}}) "
-                f"MERGE (a)-[:`{relation}`]->(b)",
-                s=subject, o=obj,
-            )
-
-    # 3) Native Neo4j vector index over the node embeddings (cosine similarity).
-    create_vector_index(
-        driver,
-        VECTOR_INDEX_NAME,
-        label=NODE_LABEL,
-        embedding_property="embedding",
-        dimensions=EMBED_DIM,
-        similarity_fn="cosine",
-        neo4j_database=db,
-    )
-    _wait_for_index_online(driver, db, VECTOR_INDEX_NAME)
-
-    with driver.session(database=db) as session:
-        nodes = session.run(f"MATCH (n:{NODE_LABEL}) RETURN count(n) AS c").single()["c"]
-        rels = session.run(
-            f"MATCH (:{NODE_LABEL})-[r]->(:{NODE_LABEL}) RETURN count(r) AS c"
-        ).single()["c"]
-    return {"nodes": nodes, "relationships": rels, "index": VECTOR_INDEX_NAME}
-
-
 def _wait_for_index_online(driver, db: str, name: str, timeout_s: float = 20.0) -> None:
-    """Block until the named index reports state 'ONLINE'."""
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         with driver.session(database=db) as session:
@@ -296,49 +216,107 @@ def _wait_for_index_online(driver, db: str, name: str, timeout_s: float = 20.0) 
         threading.Event().wait(0.5)
 
 
-def make_semantic_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> VectorRetriever:
-    """Pure vector similarity retriever, returns the most similar nodes, no traversal.
+# Everything SimpleKGPipeline writes carries this label, so the wipe is scoped to
+# this demo's own output instead of a blanket delete.
+KG_LABEL = "__KGBuilder__"
 
-    On a multi-hop question it surfaces related concepts as separate pieces but cannot
-    connect them to a person, because similarity has no notion of a relationship.
+
+def reset_graph(driver, db: str) -> None:
+    """Drop this demo's vector index and the nodes the pipeline created."""
+    drop_index_if_exists(driver, VECTOR_INDEX_NAME, neo4j_database=db)
+    with driver.session(database=db) as session:
+        session.run(f"MATCH (n:`{KG_LABEL}`) DETACH DELETE n")
+        session.run(f"MATCH (c:{CHUNK_LABEL}) DETACH DELETE c")
+        session.run("MATCH (d:Document) DETACH DELETE d")
+
+
+def build_pipeline(driver, db: str, llm=None, embedder=None) -> SimpleKGPipeline:
+    """Construct the LLM extraction pipeline with the schema pinned.
+
+    from_pdf=False so we can pass text directly. perform_entity_resolution=True
+    merges duplicate entities (one Iberia, not one per chunk). One hotel-sized
+    chunk keeps the whole conversation together for extraction.
+    """
+    return SimpleKGPipeline(
+        llm=llm or get_llm(),
+        driver=driver,
+        embedder=embedder or get_embedder(),
+        schema=GRAPH_SCHEMA,
+        from_pdf=False,
+        perform_entity_resolution=True,
+        neo4j_database=db,
+        text_splitter=FixedSizeSplitter(chunk_size=4000, chunk_overlap=0),
+    )
+
+
+async def seed_graph(driver, db: str, text: str = CONVERSATION_TEXT,
+                     llm=None, embedder=None) -> dict:
+    """Extract the graph from text with the LLM, then build the chunk vector index.
+
+    Returns a summary (entity + relationship + index) for the notebook output.
+    """
+    pipeline = build_pipeline(driver, db, llm=llm, embedder=embedder)
+    await pipeline.run_async(text=text)
+
+    # SimpleKGPipeline embeds chunks but does not create the index; create it here.
+    create_vector_index(
+        driver, VECTOR_INDEX_NAME, label=CHUNK_LABEL, embedding_property="embedding",
+        dimensions=EMBED_DIM, similarity_fn="cosine", neo4j_database=db,
+    )
+    _wait_for_index_online(driver, db, VECTOR_INDEX_NAME)
+
+    with driver.session(database=db) as session:
+        entities = session.run(
+            "MATCH (e:__Entity__) RETURN count(e) AS c"
+        ).single()["c"]
+        rels = session.run(
+            "MATCH (:__Entity__)-[r]->(:__Entity__) RETURN count(r) AS c"
+        ).single()["c"]
+    return {"entities": entities, "relationships": rels, "index": VECTOR_INDEX_NAME}
+
+
+def make_semantic_retriever(driver, db: str, embedder=None) -> VectorRetriever:
+    """Similarity over chunks only, no traversal.
+
+    Returns the most similar chunk text. It contains the facts as prose but the
+    retriever cannot follow the relationships between the entities in them.
     """
     return VectorRetriever(
-        driver,
-        index_name=VECTOR_INDEX_NAME,
-        embedder=embedder,
-        return_properties=["name", "text", "type"],
-        neo4j_database=db,
+        driver, index_name=VECTOR_INDEX_NAME,
+        embedder=embedder or get_embedder(),
+        return_properties=["text"], neo4j_database=db,
     )
 
 
-def make_graph_retriever(driver, db: str, embedder: OpenAIEmbeddings) -> VectorCypherRetriever:
-    """Vector similarity + Cypher graph traversal retriever.
-
-    Finds an entry node by similarity, then walks the relationships back to a Person
-    and returns the full chain, the multi-hop answer.
-    """
+def make_graph_retriever(driver, db: str, embedder=None) -> VectorCypherRetriever:
+    """Similarity to an entry chunk, then a Cypher traversal to the connected Person."""
     return VectorCypherRetriever(
-        driver,
-        index_name=VECTOR_INDEX_NAME,
+        driver, index_name=VECTOR_INDEX_NAME,
         retrieval_query=RETRIEVAL_QUERY,
-        embedder=embedder,
-        neo4j_database=db,
+        embedder=embedder or get_embedder(), neo4j_database=db,
     )
 
 
-def build() -> tuple:
-    """Convenience: connect, ensure DB + language, reset, seed. Returns (driver, db, embedder).
+def teardown_graph(driver, db: str) -> None:
+    """Full teardown: clear this demo's nodes/index, then drop the isolated database."""
+    reset_graph(driver, db)
+    if db == DEFAULT_DATABASE:
+        print(f"  running on the default database '{db}'; cleared this demo's nodes only.")
+        return
+    with driver.session(database="system") as session:
+        session.run(f"DROP DATABASE {db} IF EXISTS")
+    print(f"  dropped database '{db}' (full teardown).")
 
-    The caller owns the driver and should close it when done.
-    """
+
+async def build() -> tuple:
+    """Connect, ensure DB + language, reset, extract the graph. Returns (driver, db, embedder)."""
     driver = get_driver()
     db = ensure_database(driver)
     embedder = get_embedder()
     reset_graph(driver, db)
-    summary = seed_graph(driver, db, embedder)
+    summary = await seed_graph(driver, db, embedder=embedder)
     print(
-        f"  Seeded graph in database '{db}': "
-        f"{summary['nodes']} nodes, {summary['relationships']} relationships, "
-        f"vector index '{summary['index']}'."
+        f"  Extracted graph in '{db}': {summary['entities']} entities, "
+        f"{summary['relationships']} relationships, vector index '{summary['index']}'."
     )
     return driver, db, embedder

@@ -84,7 +84,7 @@ def ensure_database(driver) -> str:
     except Exception as exc:
         db = DEFAULT_DATABASE
         print(
-            f"  ⚠️  Could not create database '{NEO4J_DATABASE}' ({str(exc).splitlines()[0][:80]}).\n"
+            f"  Could not create database '{NEO4J_DATABASE}' ({str(exc).splitlines()[0][:80]}).\n"
             f"      Falling back to the default database '{db}'. On Neo4j Community this is expected."
         )
         return db

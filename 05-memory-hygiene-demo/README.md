@@ -99,7 +99,11 @@ uv venv && uv pip install -r requirements.txt
 cp .env.example .env   # fill in OPENAI_API_KEY and (for the graph track) NEO4J_* values
 ```
 
-### Run Demo
+### Deterministic vs model-based
+
+The control lives in the agent's harness: a `GatedMemoryStore` inside the `MemoryManager`. Gate 1 (regex rules), the storage, and the keep/reject control flow are deterministic. Gate 2 (the LLM classifier) is model inference, and so are the embeddings the graph track uses; a model call carries no reproducibility guarantee across runs ([research](https://arxiv.org/abs/2601.17768)). The gate keeps the deterministic rule screen first and reserves the one model-based step for the semantic judgment rules cannot make.
+
+## Run Demo
 
 ```bash
 uv run python test_memory_hygiene.py

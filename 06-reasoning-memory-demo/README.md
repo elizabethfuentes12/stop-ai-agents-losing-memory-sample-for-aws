@@ -36,6 +36,8 @@ agent = Agent(
 
 After the agent answers, the trace is just data: `{question, steps: [{tool, input, evidence}], outcome}`. Replaying "why did you recommend Iberia?" returns the **real** chain instead of a reconstruction.
 
+The recorder is a `HookProvider` that subscribes to three lifecycle events the agent already emits: it opens a trace on `BeforeInvocationEvent`, appends one step per `AfterToolCallEvent` (tool, input, evidence), and persists the finished trace to `agent.state` on `AfterInvocationEvent`. It is written out in full in a notebook cell (and kept identically in `trace_kv.py`), because it is the point of the demo rather than a hidden helper.
+
 ### 2. The core finding: the reverse audit is where the graph earns its keep
 
 Both stores replay "why did I decide X?" equally well. The question that separates them is the **reverse audit**: *"evidence source S turned out to be wrong: which of my decisions depended on it?"*
@@ -52,7 +54,7 @@ The demo seeds 5 decisions; 4 depend on a fare-alerts feed: 2 **directly**, 2 on
 The graph also returns the **receipt**: the exact evidence path connecting each decision to the compromised source:
 
 ```
-trip-itinerary -> itinerary-draft -> madrid-fare -> madrid-fare-alert -> fare_alerts_feed
+trip-itinerary -> trip-itinerary-step-1 -> itinerary-draft -> madrid-fare -> madrid-fare-alert -> fare_alerts_feed
 ```
 
 All numbers are deterministic checks against a known seeded history: no LLM judge, reproducible.
@@ -117,7 +119,11 @@ uv venv && uv pip install -r requirements.txt
 cp .env.example .env   # fill in OPENAI_API_KEY and (for the graph tests) NEO4J_* values
 ```
 
-### Run Demo
+### Deterministic vs model-based
+
+The control lives in the agent's harness: the `DecisionTraceRecorder` is a Strands `HookProvider` attached with `Agent(hooks=[...])`. The whole audit track is deterministic code: assembling the trace, the provenance graph, the `DERIVED_FROM*0..` traversal, and the flat scan all reproduce for the same input, which is why the 2/4 vs 4/4 scorecard needs no LLM judge. The one model-based part is upstream, the agent deciding which tools to call; recording and auditing that decision afterwards is deterministic ([research on model non-determinism](https://arxiv.org/abs/2601.17768)).
+
+## Run Demo
 
 ```bash
 uv run python test_reasoning_memory.py
@@ -182,7 +188,7 @@ The graph track creates an isolated Neo4j database (`reasoningdemo`) for the dec
 | Database create fails on Community | Expected. The demo falls back to the default database automatically. |
 | Traces missing after a run | The recorder writes at invocation end; check `agent.state.get("decision_traces")` after the call returns. |
 
-**Tested versions:** Strands 1.46.0, `neo4j-graphrag` 1.18.0, `neo4j` driver 6.2.0, Neo4j server 2026.01.3.
+**Tested versions:** Strands 1.55.1, `neo4j-graphrag` 1.18.0, `neo4j` driver 6.2.0, Neo4j server 2026.01.3.
 
 ---
 

@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 
 import boto3
 
-MEMORY_NAME = os.getenv("AGENTCORE_MEMORY_NAME", "SelectiveMemoryDemoV2")
+MEMORY_NAME = os.getenv("AGENTCORE_MEMORY_NAME", "SelectiveMemoryDemo")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 _session = None
@@ -162,12 +162,16 @@ def retrieve_by_namespace(memory_id: str, namespace: str, query: str,
 
 def wait_for_extraction(memory_id: str, strategy_id: str, actor_id: str, query: str,
                         expect_min: int = 1, timeout_s: int = 300) -> float | None:
-    """Poll until at least expect_min records are retrievable under the facts
-    namespace; return the lag in seconds (the number AWS doesn't publish), or None."""
+    """Poll until records are retrievable through the SAME path the notebook reads.
+
+    Uses retrieve() (the /strategies/{id}/actors/{actor} namespace), not a different
+    canonical namespace, so a positive wait guarantees the later retrieve finds the
+    records. Returns the lag in seconds (the number AWS doesn't publish), or None if
+    extraction has not surfaced records before the timeout.
+    """
     start = time.time()
-    namespace = f"/facts/{actor_id}/"
     while time.time() - start < timeout_s:
-        if len(retrieve_by_namespace(memory_id, namespace, query, top_k=5)) >= expect_min:
+        if len(retrieve(memory_id, strategy_id, actor_id, query, top_k=5)) >= expect_min:
             return time.time() - start
         threading.Event().wait(10)
     return None

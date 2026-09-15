@@ -130,7 +130,13 @@ def search_offers(origin: str, destination: str, departure_date: str,
             simplified.sort(key=lambda o: o["price"])
             if simplified:
                 return simplified[:max_results]
-        except requests.HTTPError:
+        except requests.HTTPError as exc:
+            # 429 (rate limit) and 5xx are transient: back off and retry. Other
+            # 4xx are the caller's fault, so stop and fall back.
+            status = exc.response.status_code if exc.response is not None else None
+            if status in (429, 500, 502, 503, 504) and attempt < _RETRIES - 1:
+                threading.Event().wait(2 * (attempt + 1))
+                continue
             break
         except requests.RequestException:
             if attempt < _RETRIES - 1:

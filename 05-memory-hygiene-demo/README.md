@@ -1,5 +1,7 @@
 # Memory Hygiene for AI Agents: What an Agent Should NOT Remember
 
+![AI agent memory poisoning: a malicious message tries to reach the agent's memory, a shield blocks it at the write path, and poisoned memory cards are stopped from being stored](images/ai-agent-memory-poisoning-cover.jpg)
+
 **Problem:** Poisoned or injected content that reaches long-term memory persists across sessions and silently corrupts future answers. It is a documented attack class.
 
 **Solution:** Defend at the **write path** (screen content before it's stored) and **forget** selectively (delete already-poisoned memory).
@@ -31,14 +33,14 @@ It is not a harmless false opinion (an extra airline in a list). It revokes the 
 
 ### The core finding: blast radius depends on the memory store
 
-The demo runs that same attack against two backends and measures how many of 4 legitimate questions/lookups get contaminated by **one** poisoned item:
+The demo runs that same attack against two backends and measures how many of 4 legitimate booking questions get hijacked by **one** poisoned item:
 
-![Blast radius: key-value vs graph](images/memory-hygiene-blast-radius.png)
+![Blast radius: one poisoned fact skews 1 of 4 lookups in key-value memory but hijacks 4 of 4 booking decisions in a graph](images/ai-agent-memory-poisoning-blast-radius.png)
 
 | Backend | Poisoned (no defense) | Gated (write-gate) | Cleaned (forget) |
 |---------|-----------------------|--------------------|------------------|
 | **Key-value** (`agent.state`) | **1/4** (poison is one blob under one key) | 0/4 | 0/4 |
-| **Graph** (Neo4j) | **4/4** (one false fact propagates through every multi-hop traversal) | 0/4 | 0/4 |
+| **Graph** (Neo4j) | **4/4** (poison wires a conflicting `SHOULD_BOOK` edge onto the same traveler) | 0/4 | 0/4 |
 
 **The lesson:** the write-gate stops poison in *both* stores. But in a graph, a single poisoned fact contaminates every multi-hop answer that traverses it, so graph memory is more powerful *and* more sensitive to poisoning, and the write-gate matters most there. Cleanup differs too: a graph `DETACH DELETE` removes the node **and all its edges**, recovering every contaminated answer at once.
 

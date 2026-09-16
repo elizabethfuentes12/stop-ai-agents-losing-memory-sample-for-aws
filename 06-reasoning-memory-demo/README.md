@@ -34,7 +34,7 @@ agent = Agent(
 )
 ```
 
-After the agent answers, the trace is just data: `{question, steps: [{tool, input, evidence}], outcome}`. Replaying "why did you recommend Iberia?" returns the **real** chain instead of a reconstruction.
+After the agent answers, the trace is just data: `{question, steps: [{tool, input, evidence}], outcome}`, persisted in `agent.state`. Ask "why did you recommend that flight?" and it replays the **real** chain instead of a reconstruction, even after a restart (the session manager restores the trace).
 
 The recorder is a `HookProvider` that subscribes to three lifecycle events the agent already emits: it opens a trace on `BeforeInvocationEvent`, appends one step per `AfterToolCallEvent` (tool, input, evidence), and persists the finished trace to `agent.state` on `AfterInvocationEvent`. It is written out in full in a notebook cell (and kept identically in `trace_kv.py`), because it is the point of the demo rather than a hidden helper.
 

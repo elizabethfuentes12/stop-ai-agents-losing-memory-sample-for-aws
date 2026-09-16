@@ -23,6 +23,7 @@ connected nodes, not because it is handed the answer.
 Requires a running Neo4j and an OPENAI_API_KEY. See README for setup.
 """
 
+import asyncio
 import os
 from dotenv import load_dotenv
 
@@ -188,7 +189,7 @@ if __name__ == "__main__":
     print("  Semantic recall vs graph traversal, same graph, one multi-hop question")
     print("=" * 70)
 
-    driver, db, embedder = gm.build()
+    driver, db, embedder = asyncio.run(gm.build())
     try:
         r1 = run_test_1_semantic(driver, db, embedder)
         r2 = run_test_2_graph(driver, db, embedder)

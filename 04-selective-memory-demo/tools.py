@@ -2,7 +2,7 @@
 
 Memory is NOT handled here. In this demo, remembering is done by Strands' native
 memory framework (`MemoryManager` + a `MemoryStore` + a `ModelExtractor`; see
-`memory_config.py`), not by hand-rolled memory tools and not by instructions in the
+`test_selective_memory.py` and the `chat_*.py` apps), not by hand-rolled memory tools and not by instructions in the
 chat agent's system prompt. These tools are the agent's *domain* capabilities only.
 
 The flight and climate tools call live APIs (Duffel sandbox, Open-Meteo), no

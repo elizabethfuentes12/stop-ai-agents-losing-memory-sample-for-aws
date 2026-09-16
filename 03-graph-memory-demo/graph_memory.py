@@ -221,6 +221,23 @@ def _wait_for_index_online(driver, db: str, name: str, timeout_s: float = 20.0) 
 KG_LABEL = "__KGBuilder__"
 
 
+def triples_for_sentence(driver, db: str, sentence: str) -> list[dict]:
+    """Return the (subject, relation, object) triples the pipeline extracted from one
+    sentence, by matching the chunk whose text is that sentence and reading the
+    relationships between the entities extracted from it. Lets a tool report what it
+    just wrote to the graph as structured triples, e.g. to log them in agent.state.
+    """
+    query = (
+        f"MATCH (c:{CHUNK_LABEL})<-[:FROM_CHUNK]-(a:__Entity__)-[r]->(b:__Entity__) "
+        "WHERE c.text = $sentence "
+        "RETURN DISTINCT a.name AS subject, type(r) AS relation, b.name AS object"
+    )
+    with driver.session(database=db) as session:
+        rows = session.run(query, sentence=sentence)
+        return [{"subject": r["subject"], "relation": r["relation"], "object": r["object"]}
+                for r in rows]
+
+
 def reset_graph(driver, db: str) -> None:
     """Drop this demo's vector index and the nodes the pipeline created."""
     drop_index_if_exists(driver, VECTOR_INDEX_NAME, neo4j_database=db)

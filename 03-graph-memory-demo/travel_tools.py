@@ -23,7 +23,7 @@ go in agent.state).
 import asyncio
 import json
 
-from strands import tool
+from strands import tool, ToolContext
 
 import flights_api
 import weather_api
@@ -73,8 +73,8 @@ def _run_async(coro):
         return pool.submit(lambda: asyncio.run(coro)).result()
 
 
-@tool
-def remember_fact(sentence: str) -> str:
+@tool(context=True)
+def remember_fact(sentence: str, tool_context: ToolContext) -> str:
     """Record something the user said into graph memory.
 
     Pass one plain-English sentence stating a durable fact (who works where, which
@@ -94,7 +94,13 @@ def remember_fact(sentence: str) -> str:
     create_vector_index(driver, gm.VECTOR_INDEX_NAME, label=gm.CHUNK_LABEL,
                         embedding_property="embedding", dimensions=gm.EMBED_DIM,
                         similarity_fn="cosine", neo4j_database=db)
-    return f"Extracted and stored into the graph: {sentence!r}"
+    # Log the triples the pipeline extracted into agent.state, so the harness holds a
+    # structured record of what this session wrote (readable via /memory and the tests).
+    triples = gm.triples_for_sentence(driver, db, sentence)
+    remembered = tool_context.agent.state.get("remembered_facts") or []
+    remembered.extend(triples)
+    tool_context.agent.state.set("remembered_facts", remembered)
+    return f"Extracted and stored into the graph: {sentence!r} ({len(triples)} triple(s))"
 
 
 @tool

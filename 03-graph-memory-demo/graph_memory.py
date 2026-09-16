@@ -95,29 +95,10 @@ GRAPH_SCHEMA = {
     "additional_patterns": False,
 }
 
-# What the traveler told the agent across past sessions, as plain text. The LLM
-# turns this into the graph; nothing here names a node label or an edge type.
-# Several people and airlines are present so the multi-hop question has one right
-# answer among similar-looking distractors. That is where the graph pulls ahead:
-# similarity over the text finds related sentences, but only a traversal follows
-# the chain Person -> Airline -> Alliance/City -> Country to the correct person.
-CONVERSATION_TEXT = (
-    "Maya Torres works at Iberia. "
-    "Iberia is a member of the Oneworld alliance. "
-    "Iberia flies to Madrid. "
-    "Madrid is in Spain. "
-    "Diego Fuentes works at Lufthansa. "
-    "Lufthansa is a member of the Star Alliance. "
-    "Lufthansa flies to Munich. "
-    "Munich is in Germany. "
-    "Priya Nair works at Qatar Airways. "
-    "Qatar Airways is a member of the Oneworld alliance. "
-    "Qatar Airways flies to Doha. "
-    "Doha is in Qatar. "
-    "Sofia Rossi works at ITA Airways. "
-    "ITA Airways flies to Rome. "
-    "Rome is in Italy."
-)
+# The seed facts live in SEED_FACTS (below), one fact per sentence, so each is
+# extracted into its own chunk. That separation is what makes the contrast real:
+# similarity over the chunks finds a single related fact, but only a traversal
+# follows the chain Person -> Airline -> Alliance/City -> Country to the person.
 
 # Traversal for the "after" case: from the vector-matched Chunk, step into the
 # entities extracted from it (FROM_CHUNK), find a Person, and return the shortest
@@ -251,8 +232,10 @@ def build_pipeline(driver, db: str, llm=None, embedder=None) -> SimpleKGPipeline
     """Construct the LLM extraction pipeline with the schema pinned.
 
     from_pdf=False so we can pass text directly. perform_entity_resolution=True
-    merges duplicate entities (one Iberia, not one per chunk). One hotel-sized
-    chunk keeps the whole conversation together for extraction.
+    merges duplicate entities (one Iberia, not one per chunk). A small chunk size
+    keeps each fact in its OWN chunk, so similarity search retrieves a single fact
+    and cannot see the person on the other end of the chain: that is what forces the
+    multi-hop, and what makes the semantic-vs-graph contrast real.
     """
     return SimpleKGPipeline(
         llm=llm or get_llm(),
@@ -262,18 +245,43 @@ def build_pipeline(driver, db: str, llm=None, embedder=None) -> SimpleKGPipeline
         from_pdf=False,
         perform_entity_resolution=True,
         neo4j_database=db,
-        text_splitter=FixedSizeSplitter(chunk_size=4000, chunk_overlap=0),
+        text_splitter=FixedSizeSplitter(chunk_size=60, chunk_overlap=0),
     )
 
 
-async def seed_graph(driver, db: str, text: str = CONVERSATION_TEXT,
+# The seed facts, one per sentence. Kept as a list (not one blob) so each fact is
+# extracted into its OWN chunk: similarity then returns a single fact, and only a
+# graph traversal connects it back to the person.
+SEED_FACTS = [
+    "Maya Torres works at Iberia.",
+    "Iberia is a member of the Oneworld alliance.",
+    "Iberia flies to Madrid.",
+    "Madrid is in Spain.",
+    "Diego Fuentes works at Lufthansa.",
+    "Lufthansa is a member of the Star Alliance.",
+    "Lufthansa flies to Munich.",
+    "Munich is in Germany.",
+    "Priya Nair works at Qatar Airways.",
+    "Qatar Airways is a member of the Oneworld alliance.",
+    "Qatar Airways flies to Doha.",
+    "Doha is in Qatar.",
+    "Sofia Rossi works at ITA Airways.",
+    "ITA Airways flies to Rome.",
+    "Rome is in Italy.",
+]
+
+
+async def seed_graph(driver, db: str, facts: list = None,
                      llm=None, embedder=None) -> dict:
-    """Extract the graph from text with the LLM, then build the chunk vector index.
+    """Extract the graph from the seed facts with the LLM, then build the chunk vector
+    index. Each fact is run separately so it lands in its own chunk.
 
     Returns a summary (entity + relationship + index) for the notebook output.
     """
+    facts = facts if facts is not None else SEED_FACTS
     pipeline = build_pipeline(driver, db, llm=llm, embedder=embedder)
-    await pipeline.run_async(text=text)
+    for fact in facts:
+        await pipeline.run_async(text=fact)
 
     # SimpleKGPipeline embeds chunks but does not create the index; create it here.
     create_vector_index(

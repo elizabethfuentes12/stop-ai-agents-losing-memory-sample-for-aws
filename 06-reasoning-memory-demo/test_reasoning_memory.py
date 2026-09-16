@@ -32,11 +32,14 @@ Tests 1-2 need only an OPENAI_API_KEY. Tests 3-4 also need a running Neo4j. See 
 """
 
 import os
+import tempfile
 from dotenv import load_dotenv
 
 from strands import Agent
 # Using OpenAI-compatible interface via Strands SDK (not direct OpenAI usage)
 from strands.models.openai import OpenAIModel
+from strands.session import SnapshotSessionManager
+from strands.storage import LocalFileStorage
 
 import trace_kv as kv
 import trace_graph as tg
@@ -65,33 +68,47 @@ SYSTEM_PROMPT = (
 
 WHY_QUESTION = "Why did you recommend that Madrid flight?"
 
+# One storage dir for the whole run so a "restart" restores the same session.
+_SESSION_DIR = tempfile.mkdtemp(prefix="reasoning-sessions-")
+
+
+def _session_manager(session_id):
+    """A real Strands session manager. Two agents built with the same session_id and
+    storage share one persisted conversation and state: the second is a genuine restart,
+    not a fabricated copy."""
+    return SnapshotSessionManager(session_id=session_id, storage=LocalFileStorage(_SESSION_DIR))
+
 
 def run_test_1_no_trace():
     """Test 1: The problem, the reasoning is gone, so the agent confabulates.
 
-    One agent, no recorder. It decides with its tools, then is asked WHY. Nothing
-    persisted the reasoning chain, so there is no trace to consult and the answer is a
-    plausible reconstruction, not the real steps. (A session manager would carry the
-    conversation forward across restarts, but not the tool-by-tool reasoning, that is
-    exactly the gap the recorder in Test 2 fills.)
+    The agent decides in one session, then we restart it: a brand-new Agent instance
+    restores the SAME session through the session manager (Strands' own persistence, not
+    a hand-made copy). Asked WHY after the restart, it has no recorded reasoning to
+    consult, because no recorder ran, so the answer is a plausible reconstruction. The
+    session carries the conversation across the restart, but never the tool-by-tool
+    reasoning: that is the gap the recorder in Test 2 fills.
     """
     print("\n" + "=" * 70)
-    print("TEST 1: NO TRACE, the reasoning is lost")
+    print("TEST 1: NO TRACE, the reasoning is lost across a restart")
     print("=" * 70)
 
-    # No DecisionTraceRecorder attached: the agent runs its tools but keeps no trace.
+    # Session 1: the agent decides. No DecisionTraceRecorder, so nothing records the chain.
     agent = Agent(model=MODEL, system_prompt=SYSTEM_PROMPT,
-                  tools=[kv.search_flights, kv.check_fare_alert], callback_handler=None)
+                  tools=[kv.search_flights, kv.check_fare_alert],
+                  session_manager=_session_manager("no-trace-demo"), callback_handler=None)
     decision = agent("Find me a flight JFK to Madrid on 2026-10-10 and pick the best option.")
     print(f"\n  Decision made: {str(decision).strip()[:160]}")
 
-    # Ask the same agent WHY. With no recorder, the reasoning chain was never stored.
-    answer = agent(WHY_QUESTION)
-    print(f"\n  Asked WHY: {str(answer).strip()[:220]}")
+    # Restart: a new Agent instance restores the same session from storage.
+    restarted = Agent(model=MODEL, system_prompt=SYSTEM_PROMPT,
+                      tools=[kv.search_flights, kv.check_fare_alert],
+                      session_manager=_session_manager("no-trace-demo"), callback_handler=None)
+    answer = restarted(WHY_QUESTION)
+    print(f"\n  After restart, asked WHY: {str(answer).strip()[:220]}")
 
-    # Deterministic check: how many real reasoning steps can be recovered? No recorder
-    # ran, so no trace was written, so the answer is necessarily 0.
-    steps_recoverable = len(agent.state.get(kv.TRACES_KEY) or [])
+    # Deterministic check: no recorder ran, so no trace was ever persisted.
+    steps_recoverable = len(restarted.state.get(kv.TRACES_KEY) or [])
     print(f"\n  Real reasoning steps recoverable from the store: {steps_recoverable}")
     print("  Whatever the answer says, it is a plausible reconstruction, not the real chain.")
     return {"steps_recoverable": steps_recoverable}
@@ -100,16 +117,20 @@ def run_test_1_no_trace():
 def run_test_2_recorder():
     """Test 2: The standalone fix, a HookProvider records the trace automatically.
 
-    Same tools, same question. The only change is Agent(hooks=[DecisionTraceRecorder()]).
-    Afterwards the trace is in agent.state, and why_did_i replays the REAL chain.
+    Same tools, same question, one change: Agent(hooks=[DecisionTraceRecorder()]). The
+    recorder writes the trace into agent.state, which the session manager persists. After
+    a restart (a new Agent instance restoring the same session), the trace is still there
+    and why_did_i replays the REAL chain, proving the reasoning survives across sessions.
     """
     print("\n" + "=" * 70)
-    print("TEST 2: RECORDER, the HookProvider captures the trace (zero tool changes)")
+    print("TEST 2: RECORDER, the trace survives a restart (zero tool changes)")
     print("=" * 70)
 
+    # Session 1: decide, with the recorder attached.
     agent = Agent(model=MODEL, system_prompt=SYSTEM_PROMPT,
                   tools=[kv.search_flights, kv.check_fare_alert, kv.why_did_i],
-                  hooks=[kv.DecisionTraceRecorder()], callback_handler=None)
+                  hooks=[kv.DecisionTraceRecorder()],
+                  session_manager=_session_manager("recorder-demo"), callback_handler=None)
     decision = agent("Find me a flight JFK to Madrid on 2026-10-10 and pick the best option.")
     print(f"\n  Decision made: {str(decision).strip()[:160]}")
 
@@ -117,13 +138,18 @@ def run_test_2_recorder():
     recorded_steps = sum(len(t["steps"]) for t in traces)
     print(f"  Recorded automatically: {len(traces)} trace(s), {recorded_steps} step(s) with evidence")
 
-    answer = agent(WHY_QUESTION)
-    print(f"\n  Asked WHY (agent replays its own trace): {str(answer).strip()[:220]}")
+    # Restart: a new Agent instance restores the same session, trace and all.
+    restarted = Agent(model=MODEL, system_prompt=SYSTEM_PROMPT,
+                      tools=[kv.search_flights, kv.check_fare_alert, kv.why_did_i],
+                      hooks=[kv.DecisionTraceRecorder()],
+                      session_manager=_session_manager("recorder-demo"), callback_handler=None)
+    answer = restarted(WHY_QUESTION)
+    print(f"\n  After restart, asked WHY (agent replays its own trace): {str(answer).strip()[:220]}")
 
-    # Deterministic check: the replay recovers the actual recorded chain.
-    trace = kv.replay_why(agent.state.get(kv.TRACES_KEY) or [], "Madrid")
+    # Deterministic check: the persisted trace survives and the replay recovers the chain.
+    trace = kv.replay_why(restarted.state.get(kv.TRACES_KEY) or [], "Madrid")
     replayed_steps = len(trace["steps"]) if trace else 0
-    print(f"\n  Real reasoning steps recoverable from the store: {replayed_steps}/{recorded_steps}")
+    print(f"\n  Real reasoning steps recoverable after restart: {replayed_steps}/{recorded_steps}")
     return {"recorded_steps": recorded_steps, "replayed_steps": replayed_steps}
 
 

@@ -71,7 +71,7 @@ Reasoning memory is honestly a **different concern**: **provenance and auditabil
 
 | Test | What it does |
 |------|--------------|
-| **1. No trace** | The agent decides with tools; a later session asked "why?" confabulates: 0 real steps recoverable |
+| **1. No trace** | The agent decides with tools; after a real restart (session restored via a session manager) it is asked "why?" and confabulates: 0 real steps recoverable |
 | **2. Recorder** | Same tools + `hooks=[DecisionTraceRecorder()]`; the agent replays its own real chain (2/2 steps) |
 | **3. Graph replay** | The same traces as `(:Decision)-[:HAS_STEP]->(:Step)-[:USED]->(:Evidence)` chains in Neo4j |
 | **4. Reverse audit** | "The fare-alerts feed was compromised": flat scan finds 2/4 affected decisions, graph traversal 4/4 |

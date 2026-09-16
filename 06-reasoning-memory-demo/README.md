@@ -14,7 +14,7 @@ Related research (traceability/provenance theme):
 
 This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) for the graph track.
 
-> **Official integration.** The graph track wires Neo4j by hand on purpose, to keep the bespoke provenance schema and reverse-audit traversal (`DERIVED_FROM*0..`) visible. For plain graph memory in production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/) (a `Neo4jSessionManager` for `Agent(session_manager=...)`). It is a Neo4j Labs package (community-supported), not part of the Strands SDK core.
+> **Official integration.** The graph track wires Neo4j by hand on purpose, to keep the bespoke provenance schema and reverse-audit traversal (`DERIVED_FROM*0..`) visible. For plain graph memory in production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/): a `Neo4jMemoryStore` you attach with `MemoryManager(stores=[...])` (the preferred path), plus a `Neo4jSessionManager` and pull-based memory tools. It is a Neo4j Labs package (community-supported), not part of the Strands SDK core.
 
 ![Reasoning memory architecture: HookProvider records decision traces automatically; flat store answers 2/4 reverse audit, graph traversal answers 4/4](images/ai-agent-reasoning-memory-architecture.png)
 

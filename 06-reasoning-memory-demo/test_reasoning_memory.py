@@ -69,31 +69,29 @@ WHY_QUESTION = "Why did you recommend that Madrid flight?"
 def run_test_1_no_trace():
     """Test 1: The problem, the reasoning is gone, so the agent confabulates.
 
-    The agent decides (with tools), then a FRESH agent, same model, same memory the
-    earlier demos would carry (the outcome, not the reasoning), is asked WHY. It has
-    no trace to consult, so whatever it answers is reconstruction, not the real chain.
+    One agent, no recorder. It decides with its tools, then is asked WHY. Nothing
+    persisted the reasoning chain, so there is no trace to consult and the answer is a
+    plausible reconstruction, not the real steps. (A session manager would carry the
+    conversation forward across restarts, but not the tool-by-tool reasoning, that is
+    exactly the gap the recorder in Test 2 fills.)
     """
     print("\n" + "=" * 70)
     print("TEST 1: NO TRACE, the reasoning is lost")
     print("=" * 70)
 
-    deciding_agent = Agent(model=MODEL, system_prompt=SYSTEM_PROMPT,
-                           tools=[kv.search_flights, kv.check_fare_alert], callback_handler=None)
-    decision = deciding_agent("Find me a flight JFK to Madrid on 2026-10-10 and pick the best option.")
+    # No DecisionTraceRecorder attached: the agent runs its tools but keeps no trace.
+    agent = Agent(model=MODEL, system_prompt=SYSTEM_PROMPT,
+                  tools=[kv.search_flights, kv.check_fare_alert], callback_handler=None)
+    decision = agent("Find me a flight JFK to Madrid on 2026-10-10 and pick the best option.")
     print(f"\n  Decision made: {str(decision).strip()[:160]}")
 
-    # A later session: only the outcome survived (like demos 01-02 would store).
-    # The reasoning chain was never persisted anywhere.
-    later_agent = Agent(model=MODEL, system_prompt=SYSTEM_PROMPT, callback_handler=None)
-    later_agent.state.set("known_fact", "I recommended an Iberia JFK-MAD flight to this traveler.")
-    answer = later_agent(
-        f"Earlier you told me: 'I recommend the Iberia JFK-MAD flight.' {WHY_QUESTION}"
-    )
-    print(f"\n  Later session, asked WHY: {str(answer).strip()[:220]}")
+    # Ask the same agent WHY. With no recorder, the reasoning chain was never stored.
+    answer = agent(WHY_QUESTION)
+    print(f"\n  Asked WHY: {str(answer).strip()[:220]}")
 
-    # Deterministic check: how many real reasoning steps can this session recover?
-    # There is no trace store at all, so the answer is necessarily 0.
-    steps_recoverable = len(later_agent.state.get(kv.TRACES_KEY) or [])
+    # Deterministic check: how many real reasoning steps can be recovered? No recorder
+    # ran, so no trace was written, so the answer is necessarily 0.
+    steps_recoverable = len(agent.state.get(kv.TRACES_KEY) or [])
     print(f"\n  Real reasoning steps recoverable from the store: {steps_recoverable}")
     print("  Whatever the answer says, it is a plausible reconstruction, not the real chain.")
     return {"steps_recoverable": steps_recoverable}

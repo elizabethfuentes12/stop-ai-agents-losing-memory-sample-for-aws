@@ -1,10 +1,10 @@
 # Memory Hygiene for AI Agents: What an Agent Should NOT Remember
 
-![AI agent memory poisoning: a malicious message tries to reach the agent's memory, a shield blocks it at the write path, and poisoned memory cards are stopped from being stored](images/ai-agent-memory-poisoning-cover.jpg)
+![AI agent memory poisoning: a malicious message tries to reach the agent's memory, a shield blocks it before it is stored, and poisoned memory cards are stopped from being saved](images/ai-agent-memory-poisoning-cover.jpg)
 
 **Problem:** Poisoned or injected content that reaches long-term memory persists across sessions and silently corrupts future answers. It is a documented attack class.
 
-**Solution:** Defend at the **write path** (screen content before it's stored) and **forget** selectively (delete already-poisoned memory).
+**Solution:** Screen every memory before it is stored (block poison as the agent tries to save it) and **forget** selectively (delete already-poisoned memory).
 
 > **Assumed familiarity:** builds on the earlier demos (agent state, semantic memory, and, for the graph track, Demo 03's Neo4j setup). The graph track needs a running Neo4j; the key-value track does not.
 
@@ -15,7 +15,7 @@ Based on research:
 
 This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) for the agent harness and [Neo4j](https://neo4j.com/) for the graph track.
 
-> **Official integration.** The graph track wires Neo4j by hand on purpose, to expose the write path and the `DETACH DELETE` blast radius that a managed layer would hide. For production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/): a `Neo4jMemoryStore` you attach with `MemoryManager(stores=[...])` (the preferred path), plus a `Neo4jSessionManager` and pull-based memory tools. It is a Neo4j Labs package (community-supported), not part of the Strands SDK core.
+> **Official integration.** The graph track wires Neo4j by hand on purpose, to expose where writes happen and the `DETACH DELETE` blast radius that a managed layer would hide. For production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/): a `Neo4jMemoryStore` you attach with `MemoryManager(stores=[...])` (the preferred path), plus a `Neo4jSessionManager` and pull-based memory tools. It is a Neo4j Labs package (community-supported), not part of the Strands SDK core.
 
 ![Memory hygiene architecture: write-gate screens injection/PII/low-trust content before it reaches key-value or graph store; forget removes what already got in](images/ai-agent-memory-hygiene-architecture.png)
 
@@ -148,7 +148,7 @@ uv run python test_memory_hygiene.py
 
 ## Learning Objectives
 
-1. Understand memory poisoning as a write-path problem, not a retrieval problem
+1. Understand memory poisoning as a problem to stop when saving a memory, not when reading it back
 2. Build a write-gate that screens injected instructions, PII, and low-trust content
 3. Forget selectively to recover from poisoning that already happened
 4. See how blast radius differs between key-value and graph memory

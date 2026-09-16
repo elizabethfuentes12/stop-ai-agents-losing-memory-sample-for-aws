@@ -131,7 +131,7 @@ class GatedMemoryStore:
         return await self._inner.search(query, options)
 
     async def add(self, content, metadata=None):
-        # Both gates run here, inside the memory harness, on the write path.
+        # Both gates run here, inside the agent's harness, as the memory is saved.
         # Gate 1: fast rule-based screen.
         verdict = screen_memory(content)
         if not verdict["allowed"]:

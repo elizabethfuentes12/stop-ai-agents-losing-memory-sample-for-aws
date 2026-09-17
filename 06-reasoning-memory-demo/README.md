@@ -16,7 +16,7 @@ This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) fo
 
 > **Official integration.** The graph track wires Neo4j by hand on purpose, to keep the bespoke provenance schema and reverse-audit traversal (`DERIVED_FROM*0..`) visible. For plain graph memory in production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/): a `Neo4jMemoryStore` you attach with `MemoryManager(stores=[...])` (the preferred path), plus a `Neo4jSessionManager` and pull-based memory tools. It is a Neo4j Labs package (community-supported), not part of the Strands SDK core.
 
-![Reasoning memory architecture: HookProvider records decision traces automatically; flat store answers 2/4 reverse audit, graph traversal answers 4/4](images/ai-agent-reasoning-memory-architecture.png)
+![Reasoning memory architecture: HookProvider records decision traces automatically; flat store answers 2/8 reverse audit, graph traversal answers 8/8](images/ai-agent-reasoning-memory-architecture.png)
 
 ---
 
@@ -42,14 +42,14 @@ The recorder is a `HookProvider` that subscribes to three lifecycle events the a
 
 Both stores replay "why did I decide X?" equally well. The question that separates them is the **reverse audit**: *"evidence source S turned out to be wrong: which of my decisions depended on it?"*
 
-The demo seeds 5 decisions; 4 depend on a fare-alerts feed: 2 **directly**, 2 only **through other decisions' outputs** (a budget built on the chosen flights; an itinerary built on that budget). Then the fare-alerts feed is declared compromised:
+The demo seeds 10 decisions; 8 depend on a fare-alerts feed: 2 **directly**, 6 only **through other decisions' outputs** (a budget on the flights, an itinerary on the budget, insurance on the itinerary, a calendar block on the insurance). Then the fare-alerts feed is declared compromised:
 
 ![Reverse audit: key-value vs graph](images/reasoning-memory-reverse-audit.png)
 
 | Store | Affected decisions found | Why |
 |-------|--------------------------|-----|
-| **Key-value** (flat scan) | **2/4** | A trace blob only mentions sources it used *directly*; indirect dependencies are invisible to a scan |
-| **Graph** (Neo4j traversal) | **4/4** | `DERIVED_FROM*0..` follows the provenance chain at any depth |
+| **Key-value** (flat scan) | **2/8** | A trace blob only mentions sources it used *directly*; indirect dependencies are invisible to a scan |
+| **Graph** (Neo4j traversal) | **8/8** | `DERIVED_FROM*0..` follows the provenance chain at any depth |
 
 The graph also returns the **receipt**: the exact evidence path connecting each decision to the compromised source:
 
@@ -63,7 +63,7 @@ All numbers are deterministic checks against a known seeded history: no LLM judg
 
 Most memory evaluations score four dimensions ([Future AGI, 2026](https://futureagi.com/blogs/ai-agent-memory-evaluation-2026)): **recall** (does it retrieve the right memory), **freshness** (is it up to date), **contradiction handling** (does it resolve conflicts), and **forgetting** (does it drop what it should not keep). Demos 04 and 05 in this series live on those axes.
 
-Reasoning memory is honestly a **different concern**: **provenance and auditability**. It does not make the agent recall more or forget better. It records *why* a decision was made and *what evidence it rested on*, so that later you can answer questions the four dimensions never ask, most importantly the reverse audit. So the metric here is not recall or precision; it is **audit completeness**: given a compromised source, what fraction of the decisions that actually depended on it can you find? Flat storage finds 2/4 (direct citations only); the provenance graph finds 4/4 (any depth). That is the number that matters for this demo, and it is a property no recall/freshness/forgetting score would surface.
+Reasoning memory is honestly a **different concern**: **provenance and auditability**. It does not make the agent recall more or forget better. It records *why* a decision was made and *what evidence it rested on*, so that later you can answer questions the four dimensions never ask, most importantly the reverse audit. So the metric here is not recall or precision; it is **audit completeness**: given a compromised source, what fraction of the decisions that actually depended on it can you find? Flat storage finds 2/8 (direct citations only); the provenance graph finds 8/8 (any depth). That is the number that matters for this demo, and it is a property no recall/freshness/forgetting score would surface.
 
 ---
 
@@ -74,7 +74,8 @@ Reasoning memory is honestly a **different concern**: **provenance and auditabil
 | **1. No trace** | The agent decides with tools; after a real restart (session restored via a session manager) it is asked "why?" and confabulates: 0 real steps recoverable |
 | **2. Recorder** | Same tools + `hooks=[DecisionTraceRecorder()]`; the agent replays its own real chain (2/2 steps) |
 | **3. Graph replay** | The same traces as `(:Decision)-[:HAS_STEP]->(:Step)-[:USED]->(:Evidence)` chains in Neo4j |
-| **4. Reverse audit** | "The fare-alerts feed was compromised": flat scan finds 2/4 affected decisions, graph traversal 4/4 |
+| **4. Reverse audit** | "The fare-alerts feed was compromised": flat scan finds the direct citations only, graph traversal finds all affected decisions at any depth |
+| **5. Why store it** | Replaying "why did I decide X?" from the trace costs 0 model tokens and returns the real chain; asking the model to reconstruct it costs tokens and confabulates. Storing saves tokens and avoids errors. |
 
 ---
 
@@ -121,7 +122,7 @@ cp .env.example .env   # fill in OPENAI_API_KEY and (for the graph tests) NEO4J_
 
 ### Deterministic vs model-based
 
-The control lives in the agent's harness: the `DecisionTraceRecorder` is a Strands `HookProvider` attached with `Agent(hooks=[...])`. The whole audit track is deterministic code: assembling the trace, the provenance graph, the `DERIVED_FROM*0..` traversal, and the flat scan all reproduce for the same input, which is why the 2/4 vs 4/4 scorecard needs no LLM judge. The one model-based part is upstream, the agent deciding which tools to call; recording and auditing that decision afterwards is deterministic ([research on model non-determinism](https://arxiv.org/abs/2601.17768)).
+The control lives in the agent's harness: the `DecisionTraceRecorder` is a Strands `HookProvider` attached with `Agent(hooks=[...])`. The whole audit track is deterministic code: assembling the trace, the provenance graph, the `DERIVED_FROM*0..` traversal, and the flat scan all reproduce for the same input, which is why the 2/8 vs 8/8 scorecard needs no LLM judge. The one model-based part is upstream, the agent deciding which tools to call; recording and auditing that decision afterwards is deterministic ([research on model non-determinism](https://arxiv.org/abs/2601.17768)).
 
 ## Run Demo
 
@@ -165,7 +166,7 @@ The graph track creates an isolated Neo4j database (`reasoningdemo`) for the dec
 
 - **Engineering pattern, not settled science.** No academic taxonomy defines "reasoning memory" as a memory type; the demo borrows the *traceability/provenance* theme that recent memory systems (MemWeaver, Engram) do support.
 - **The recorder is minimal.** It captures tool calls and final outcomes, not the model's internal chain-of-thought (which providers don't expose reliably and which can be unfaithful). What it records is what actually happened: the tools called, the evidence returned, the outcome produced.
-- **Deterministic measurement.** The seeded history fixes the ground truth (4 affected decisions by construction); both audits are checked against it. No LLM judges anything.
+- **Deterministic measurement.** The seeded history fixes the ground truth (8 affected decisions by construction); both audits are checked against it. No LLM judges anything.
 
 ---
 

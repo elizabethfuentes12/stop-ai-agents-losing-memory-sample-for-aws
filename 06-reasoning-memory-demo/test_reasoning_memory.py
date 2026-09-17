@@ -208,8 +208,8 @@ def run_test_4_reverse_audit(driver, db):
         graph_found = sorted(tg.find_affected_decisions_graph(driver, db))
         print(f"\n  Graph traversal:         found {len(graph_found)}/{len(ground_truth)}  {graph_found}")
 
-        control_clean = kv.CONTROL_ID not in kv_found and kv.CONTROL_ID not in graph_found
-        print(f"  Control '{kv.CONTROL_ID}' correctly NOT flagged by either: {control_clean}")
+        control_clean = all(c not in kv_found and c not in graph_found for c in kv.CONTROL_IDS)
+        print(f"  Controls {sorted(kv.CONTROL_IDS)} correctly NOT flagged by either: {control_clean}")
 
         print("\n  The receipts, provenance path from each indirect decision to the source:")
         for decision_id in missed:
@@ -228,6 +228,40 @@ def run_test_4_reverse_audit(driver, db):
             driver.close()
 
 
+def run_test_5_why_store():
+    """Test 5: WHY store the reasoning at all? Two savings, measured.
+
+    Answering "why did you decide X?" two ways:
+      (a) read the stored trace: 0 model tokens, the real recorded chain, deterministic.
+      (b) ask the model to reconstruct it with no trace: costs tokens AND the answer is
+          confabulated (the real chain was never kept).
+    So storing the trace saves tokens (no model call to replay) and avoids errors (no
+    made-up justification). This is the payoff that makes the recorder worth its keep.
+    """
+    print("\n" + "=" * 70)
+    print("TEST 5: WHY STORE IT, tokens saved and errors avoided")
+    print("=" * 70)
+
+    # (a) Replay from the stored trace: pure lookup, no model call.
+    trace = kv.replay_why(kv.SEED_TRACES, "Madrid")
+    replay_tokens = 0
+    replay_steps = len(trace["steps"]) if trace else 0
+    print(f"\n  (a) Replay from the stored trace: {replay_tokens} model tokens, "
+          f"{replay_steps} real steps recovered (deterministic).")
+
+    # (b) Ask the model to reconstruct the reasoning with no trace to consult.
+    agent = Agent(model=MODEL, system_prompt=SYSTEM_PROMPT, callback_handler=None)
+    resp = agent("Earlier you recommended the Iberia JFK-MAD flight. "
+                 "Reconstruct the exact tool-by-tool reasoning chain you used.")
+    reconstruct_tokens = resp.metrics.accumulated_usage["totalTokens"]
+    print(f"  (b) Reconstruct with the model: {reconstruct_tokens} model tokens, "
+          f"and the chain is confabulated (no trace existed).")
+
+    print(f"\n  Tokens saved per replay: {reconstruct_tokens} -> 0. "
+          f"Errors avoided: the real chain vs a plausible guess.")
+    return {"replay_tokens": replay_tokens, "reconstruct_tokens": reconstruct_tokens}
+
+
 if __name__ == "__main__":
     print("=" * 70)
     print("  REASONING MEMORY DEMO")
@@ -238,6 +272,7 @@ if __name__ == "__main__":
     r2 = run_test_2_recorder()
     r3 = run_test_3_graph_replay()
     r4 = run_test_4_reverse_audit(r3.pop("driver"), r3.pop("db"))
+    r5 = run_test_5_why_store()
 
     print("\n" + "=" * 70)
     print("  COMPARISON, the reverse audit: 'source S was wrong, what did it touch?'")

@@ -115,11 +115,15 @@ COMPROMISED_SOURCE = "fare_alerts_feed"
 
 # External evidence sources (everything else in a "source" field names another
 # evidence record, a derivation, not an origin).
-EXTERNAL_SOURCES = {"flight_search", "fare_alerts_feed", "weather_api"}
+EXTERNAL_SOURCES = {"flight_search", "fare_alerts_feed", "weather_api", "dining_guide"}
 
-# Decisions whose evidence chain truly reaches fare_alerts_feed (ground truth for the check).
-AFFECTED_IDS = {"madrid-flight", "tokyo-flight", "trip-budget", "trip-itinerary"}
-CONTROL_ID = "packing-list"
+# Decisions whose evidence chain truly reaches fare_alerts_feed (ground truth for the
+# check): two cite it directly, six only through other decisions' outputs, at depths
+# from one to five hops, across two branches. The two controls depend on other sources.
+AFFECTED_IDS = {"madrid-flight", "tokyo-flight", "trip-budget", "trip-itinerary",
+                "trip-insurance", "calendar-block", "visa-check", "team-notify"}
+CONTROL_IDS = {"packing-list", "restaurant-picks"}
+CONTROL_ID = "packing-list"  # kept for backward compatibility with existing callers
 
 SEED_TRACES = [
     {
@@ -194,6 +198,76 @@ SEED_TRACES = [
              "evidence": {"name": "madrid-weather",
                           "text": "Madrid in October: 21C average highs, low rainfall.",
                           "source": "weather_api"}},
+        ],
+    },
+    {
+        # Three hops from the source: trip insurance is priced off the itinerary, which
+        # was built on the budget, which was built on the flights. Nothing in this blob
+        # mentions the feed; the link is three derivations deep.
+        "id": "trip-insurance",
+        "question": "How much trip insurance should I buy for the two-city trip?",
+        "outcome": "Insurance $95, covering the $1,502 flight budget for the Madrid+Tokyo itinerary.",
+        "steps": [
+            {"n": 1, "tool": "price_insurance", "input": {"trip": "Madrid+Tokyo"},
+             "evidence": {"name": "insurance-quote",
+                          "text": "Insurance premium is 6.3% of the covered itinerary value.",
+                          "source": "itinerary-draft"}},
+        ],
+    },
+    {
+        # Four hops from the source: the calendar block is placed from the insured
+        # itinerary. This is the deepest dependency; a flat scan has no chance of
+        # connecting it back to the fare-alerts feed.
+        "id": "calendar-block",
+        "question": "Block my calendar for the confirmed trip.",
+        "outcome": "Blocked Oct 12-20 for the insured Madrid+Tokyo itinerary.",
+        "steps": [
+            {"n": 1, "tool": "block_calendar", "input": {"trip": "Madrid+Tokyo"},
+             "evidence": {"name": "calendar-hold",
+                          "text": "Held the dates for the insured two-city itinerary.",
+                          "source": "insurance-quote"}},
+        ],
+    },
+    {
+        # A second control, on a different external source. Two controls make "correctly
+        # not flagged" a stronger check: neither weather nor the restaurant guide feed
+        # touches the fare-alerts feed.
+        "id": "restaurant-picks",
+        "question": "Where should I eat in Madrid?",
+        "outcome": "Booked two tapas bars in La Latina from the local guide.",
+        "steps": [
+            {"n": 1, "tool": "find_restaurants", "input": {"city": "Madrid"},
+             "evidence": {"name": "madrid-restaurants",
+                          "text": "La Latina tapas bars, highly rated in the local dining guide.",
+                          "source": "dining_guide"}},
+        ],
+    },
+    {
+        # Five hops from the source: the visa check reads the calendar hold to know the
+        # travel dates. calendar-hold <- insurance-quote <- itinerary-draft <- madrid-fare
+        # <- madrid-fare-alert <- fare_alerts_feed. The deepest dependency in the demo.
+        "id": "visa-check",
+        "question": "Do I need a visa for these travel dates?",
+        "outcome": "No visa needed for the Oct 12-20 dates held for the trip.",
+        "steps": [
+            {"n": 1, "tool": "check_visa", "input": {"trip": "Madrid+Tokyo"},
+             "evidence": {"name": "visa-note",
+                          "text": "Checked visa rules against the held travel dates.",
+                          "source": "calendar-hold"}},
+        ],
+    },
+    {
+        # A separate branch, two hops from the source via the budget: the team is
+        # notified of the trip cost. Depends on the budget (which built on the flights),
+        # not on the itinerary line, so it widens the affected set beyond the main chain.
+        "id": "team-notify",
+        "question": "Tell my team what this trip will cost.",
+        "outcome": "Notified the team the flight budget is $1,502.",
+        "steps": [
+            {"n": 1, "tool": "notify_team", "input": {"amount": 1502},
+             "evidence": {"name": "team-message",
+                          "text": "Shared the approved $1,502 flight budget with the team.",
+                          "source": "madrid-fare"}},
         ],
     },
 ]

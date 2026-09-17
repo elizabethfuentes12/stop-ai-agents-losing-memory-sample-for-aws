@@ -20,7 +20,7 @@ These demos use Strands Agents for implementation.
 | [03 - Graph Memory](03-graph-memory-demo/) | Vector memory can't reason over relationships. Store memories as a Neo4j knowledge graph and traverse it to answer multi-hop questions: before 1/4, after 4/4. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-tools+state-blue) |
 | [04 - Selective Memory](04-selective-memory-demo/) | What to store and what to throw away. The winning agent keeps the right things and drops the rest. Three selection mechanisms measured against the same conversation: one prompt you own, four typed stores, and Amazon Bedrock AgentCore Memory (managed), scored on selection recall and who controls the keep/throw-away policy. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-core_memory-blue) |
 | [05 - Memory Hygiene](05-memory-hygiene-demo/) | What an agent should NOT remember. A write-gate blocks poisoned/injected content; forget removes it. One poisoned fact skews 1 lookup in key-value memory but hijacks 4/4 booking decisions in a graph. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-write_gate-blue) |
-| [06 - Reasoning Memory](06-reasoning-memory-demo/) | Remember WHY the agent decided, not just what it knows. A HookProvider records decision traces automatically; the reverse audit finds 2/4 affected decisions with a flat scan vs 4/4 with a graph traversal. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-provenance-blue) ![Strands](https://img.shields.io/badge/Strands-hooks-blue) |
+| [06 - Reasoning Memory](06-reasoning-memory-demo/) | Remember WHY the agent decided, not just what it knows. A HookProvider records decision traces automatically; the reverse audit finds 2/8 affected decisions with a flat scan vs 8/8 with a graph traversal. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-provenance-blue) ![Strands](https://img.shields.io/badge/Strands-hooks-blue) |
 | 07 - Hybrid Memory | *In design.* Two memories, one agent: vector + graph combined (GAAMA pattern), with S3 Vectors-built-by-hand vs AgentCore-managed at full parity. | ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![AgentCore](https://img.shields.io/badge/Bedrock-AgentCore_Memory-orange) ![Neo4j](https://img.shields.io/badge/Neo4j-graph-blue) |
 | 08 - Production Deploy | *Pending.* One deploy per memory type, pick the memory the use case needs, don't ship a monolithic all-in-one stack. |, |
 
@@ -146,8 +146,8 @@ Agent memory stores *what* the agent knows, not *why it decided*. A `DecisionTra
 
 | Store | "Why did I decide X?" | "Source S was wrong, which decisions relied on it?" |
 |-------|-----------------------|------------------------------------------------------|
-| Key-value (flat scan) | ✅ | 2/4, direct citations only |
-| Graph (Neo4j traversal) | ✅ | 4/4, follows provenance at any depth, with receipts |
+| Key-value (flat scan) | ✅ | 2/8, direct citations only |
+| Graph (Neo4j traversal) | ✅ | 8/8, follows provenance at any depth, with receipts |
 
 ```python
 agent = Agent(

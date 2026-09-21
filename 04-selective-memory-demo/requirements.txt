@@ -1,4 +1,4 @@
-strands-agents[openai]>=1.55.0
+strands-agents[openai]>=1.56.0
 boto3>=1.43.72
 faiss-cpu>=1.9.0
 numpy>=1.26.0

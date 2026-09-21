@@ -2,4 +2,4 @@ boto3>=1.40.0
 jupyter>=1.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0
-strands-agents[openai]>=1.55.0
+strands-agents[openai]>=1.56.0

@@ -35,7 +35,6 @@ from dotenv import load_dotenv
 from strands import Agent
 # Using OpenAI-compatible interface via Strands SDK (not direct OpenAI usage)
 from strands.models.openai import OpenAIModel
-from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.session import FileSessionManager, S3SessionManager
 from tools import (
     search_flights_stateless, book_flight_stateless,
@@ -126,7 +125,7 @@ def run_test_2_stateful():
     agent = Agent(
         model=MODEL,
         system_prompt=SYSTEM_PROMPT,
-        conversation_manager=SlidingWindowConversationManager(window_size=40),
+        context_manager="auto",
         tools=[search_flights, book_flight, get_user_profile, best_time_to_visit],
         callback_handler=None,
     )
@@ -154,7 +153,7 @@ def run_test_3_persistence():
         return Agent(
             model=MODEL,
             system_prompt=SYSTEM_PROMPT,
-            conversation_manager=SlidingWindowConversationManager(window_size=40),
+            context_manager="auto",
             tools=[search_flights, book_flight, get_user_profile, best_time_to_visit],
             session_manager=FileSessionManager(session_id=session_id, storage_dir=storage_dir),
             callback_handler=None,
@@ -231,7 +230,7 @@ def run_test_4_s3_persistence():
         return Agent(
             model=MODEL,
             system_prompt=SYSTEM_PROMPT,
-            conversation_manager=SlidingWindowConversationManager(window_size=40),
+            context_manager="auto",
             tools=[search_flights, book_flight, get_user_profile, best_time_to_visit],
             session_manager=S3SessionManager(session_id=session_id, bucket=bucket, prefix=prefix),
             callback_handler=None,

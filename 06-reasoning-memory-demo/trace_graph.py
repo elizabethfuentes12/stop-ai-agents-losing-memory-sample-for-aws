@@ -1,254 +1,283 @@
-"""Decision traces over a graph store (Neo4j), provenance you can traverse.
+"""Reasoning memory on Neo4j, using Neo4j's OFFICIAL agent-memory SDK.
 
-This is the graph counterpart to trace_kv.py. It stores the SAME decision traces, but as
-connected nodes instead of flat blobs:
+Demos 01-05 store WHAT the agent knows. This stores WHY it decided: the question ->
+reasoning steps -> tool calls -> touched sources chain. We do NOT hand-roll the graph
+schema. We use `neo4j-agent-memory` (Neo4j Labs), the official reasoning-memory SDK,
+so the schema, the writes, and the audit traversal are Neo4j's, not ours.
 
-    (:Decision)-[:HAS_STEP]->(:Step)-[:NEXT]->(:Step)      the reasoning chain
-    (:Step)-[:USED]->(:Evidence)                            what each step relied on
-    (:Evidence)-[:DERIVED_FROM]->(:Evidence)                evidence built on other evidence
-    (:Evidence)-[:FROM_SOURCE]->(:Source)                   external origin of the evidence
+Everything is LIVE: the agent takes real decisions with real tools, and a Strands
+HookProvider (Neo4jDecisionRecorder) records each one into Neo4j as it happens. No
+hardcoded history.
 
-Both stores answer "why did I decide X?" fine. The question that separates them is the
-REVERSE audit: "evidence source S turned out to be false, which of my decisions depended
-on it?" In the flat store that is a linear scan of each trace's own blob, so it only finds
-decisions that cite S *directly*. In the graph it is one traversal:
+Neo4j creates and manages this schema:
 
-    MATCH (d:Decision)-[:HAS_STEP]->(:Step)-[:USED]->(:Evidence)
-          -[:DERIVED_FROM*0..]->(:Evidence)-[:FROM_SOURCE]->(s:Source {name: $source})
-    RETURN DISTINCT d
+    (:ReasoningTrace)-[:HAS_STEP]->(:ReasoningStep)-[:USES_TOOL]->(:ToolCall)-[:INSTANCE_OF]->(:Tool)
+    (:ReasoningStep)-[:TOUCHED]->(:Entity)
 
-The variable-length ``DERIVED_FROM*0..`` hop is what the flat store cannot express: it
-follows provenance through decisions that depended on S only via *other decisions'
-outputs*, at any depth.
+The reverse audit ("evidence source S was wrong, which decisions touched it?") is one
+traversal over the `:TOUCHED` edges the SDK records. See VISUALIZE_QUERIES for the
+Neo4j Browser queries that draw the graph.
 
-Uses an isolated database (default ``reasoningdemo``) created in Cypher 25, matching
-demos 03 and 05, this demo's replay/audit queries are plain Cypher (no vector index
-needed), but a consistent database language means Demo 03's vector retrievers can be
-pointed at this graph later without surprises. Never touches other databases.
+Docs: https://neo4j.com/labs/agent-memory/how-to/reasoning-traces/
 """
 
+import asyncio as _asyncio
+import concurrent.futures as _futures
 import os
 import re
-import threading
-import time
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from neo4j import GraphDatabase
-from neo4j_graphrag.utils.version_utils import supports_search_clause
+from neo4j_agent_memory import MemoryClient, MemorySettings
+from neo4j_agent_memory.memory.reasoning import EntityRef
+from strands.hooks import (
+    AfterInvocationEvent, AfterToolCallEvent, BeforeInvocationEvent,
+    HookProvider, HookRegistry,
+)
 
-from trace_kv import COMPROMISED_SOURCE, EXTERNAL_SOURCES, SEED_TRACES
-
-# ── Connection config (from env / .env) ──────────────────────────────────────
 NEO4J_URI = os.getenv("NEO4J_URI", "neo4j://127.0.0.1:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+# Its own isolated database, kept clean for this demo (the SDK creates its own vector
+# indexes, which must not collide with the 1024-dim indexes other demos use).
 NEO4J_DATABASE = os.getenv("REASONING_NEO4J_DATABASE", "reasoningdemo")
-DEFAULT_DATABASE = os.getenv("NEO4J_DEFAULT_DATABASE", "neo4j")
 
-DEMO_LABELS = ("Decision", "Step", "Evidence", "Source")
+# The evidence source we later declare compromised, for the reverse audit.
+COMPROMISED_SOURCE = "fare_alerts_feed"
+
+# Which external source each tool reads from. This is tool-catalog metadata (a fact
+# about each tool), not a scripted history: it lets the recorder tag what each live
+# tool call actually touched, so the audit can traverse a decision to that source.
+TOOL_SOURCE = {
+    "search_flights": "flight_search",
+    "check_fare_alert": "fare_alerts_feed",
+    "check_weather": "weather_api",
+    "best_time_to_visit": "weather_api",
+    "find_restaurants": "dining_guide",
+}
+
+
+# ── Neo4j Browser queries to SEE the graph (paste into the reasoningdemo database) ──
+# Return paths so the Browser draws the edges; if you only RETURN nodes, turn on
+# "Connect result nodes" in the Browser settings.
+VISUALIZE_QUERIES = {
+    "full_graph": (
+        "// The whole reasoning graph: each decision's trace, its steps and tool calls,\n"
+        "// and the sources those calls touched.\n"
+        "MATCH p = (:ReasoningTrace)-[:HAS_STEP]->(:ReasoningStep)-[:USES_TOOL]->(:ToolCall)\n"
+        "RETURN p\n"
+        "UNION\n"
+        "MATCH p = (:ReasoningStep)-[:TOUCHED]->(:Entity)\n"
+        "RETURN p"
+    ),
+    "reverse_audit": (
+        "// Reverse audit: every decision whose steps touched the compromised source.\n"
+        "MATCH p = (:ReasoningTrace)-[:HAS_STEP]->(:ReasoningStep)"
+        "-[:TOUCHED]->(:Entity {name: \"fare_alerts_feed\"})\n"
+        "RETURN p"
+    ),
+    "one_decision": (
+        "// One decision end to end: its steps, tools, and touched sources.\n"
+        "MATCH p = (t:ReasoningTrace)-[*1..3]-()\n"
+        "WHERE t.task CONTAINS \"Madrid\"\n"
+        "RETURN p"
+    ),
+}
+
+
+def _settings() -> MemorySettings:
+    return MemorySettings(neo4j={
+        "uri": NEO4J_URI, "username": NEO4J_USER,
+        "password": NEO4J_PASSWORD, "database": NEO4J_DATABASE,
+    })
 
 
 def _valid_identifier(name: str) -> bool:
+    """Database names cannot be parameterized in Cypher, so they are interpolated.
+    Validate first (same guard as demos 03 and 05) so only a safe name reaches
+    CREATE/DROP DATABASE."""
     return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name))
 
 
-def get_driver():
-    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    driver.verify_connectivity()
-    return driver
+def memory_client() -> MemoryClient:
+    """A Neo4j agent-memory client bound to this demo's isolated database. Use as an
+    async context manager: `async with memory_client() as client: ...`."""
+    return MemoryClient(_settings())
 
 
-def ensure_database(driver) -> str:
-    """Create the demo's isolated database (Cypher 25 where supported); return its name.
-
-    Same approach as demos 03 and 05: atomic ``CREATE DATABASE ... DEFAULT LANGUAGE
-    CYPHER 25`` on servers that support it, no ``neo4j.conf`` edit, no restart. Falls
-    back to the default database on Neo4j Community.
-    """
+# ── Database lifecycle (plain driver; the SDK does not create databases) ─────
+def ensure_clean_database() -> None:
+    """Create the isolated reasoningdemo database and clear it, so each run starts
+    fresh. The SDK builds its own schema/indexes inside it on first connect."""
     if not _valid_identifier(NEO4J_DATABASE):
         raise ValueError(f"Invalid database name: {NEO4J_DATABASE!r}")
-
-    use_cypher_25 = supports_search_clause(driver, "system")
-    language_clause = " DEFAULT LANGUAGE CYPHER 25" if use_cypher_25 else ""
-
-    db = NEO4J_DATABASE
+    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    driver.verify_connectivity()
     try:
-        with driver.session(database="system") as session:
-            session.run(f"CREATE DATABASE {db} IF NOT EXISTS{language_clause}")
-            if use_cypher_25:
-                session.run(f"ALTER DATABASE {db} SET DEFAULT LANGUAGE CYPHER 25")
-        _wait_for_database_online(driver, db)
-        return db
-    except Exception as exc:
-        db = DEFAULT_DATABASE
-        print(
-            f"  Could not create database '{NEO4J_DATABASE}' ({str(exc).splitlines()[0][:80]}).\n"
-            f"      Falling back to the default database '{db}'. On Neo4j Community this is expected."
-        )
-        return db
+        with driver.session(database="system") as s:
+            s.run(f"CREATE DATABASE {NEO4J_DATABASE} IF NOT EXISTS")
+        import time
+        time.sleep(2)
+        with driver.session(database=NEO4J_DATABASE) as s:
+            s.run("MATCH (n) DETACH DELETE n")
+    finally:
+        driver.close()
 
 
-def _wait_for_database_online(driver, db: str, timeout_s: float = 30.0) -> None:
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        with driver.session(database="system") as session:
-            row = session.run(
-                "SHOW DATABASE $db YIELD currentStatus RETURN currentStatus", db=db
-            ).single()
-        if row and row["currentStatus"] == "online":
+def teardown_database() -> None:
+    """Drop the isolated database entirely, so nothing this demo created is left."""
+    if not _valid_identifier(NEO4J_DATABASE):
+        raise ValueError(f"Invalid database name: {NEO4J_DATABASE!r}")
+    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    try:
+        with driver.session(database="system") as s:
+            s.run(f"DROP DATABASE {NEO4J_DATABASE} IF EXISTS")
+    finally:
+        driver.close()
+
+
+# ── The queries the demo measures (deterministic Cypher over the SDK's schema) ──
+async def replay_why(client: MemoryClient, topic: str) -> dict | None:
+    """Replay "why did I decide X?" by reading the recorded trace whose task mentions
+    the topic: its outcome and the tools it used. One traversal, no model call, so the
+    answer is the REAL recorded chain, not a reconstruction."""
+    rows = await client.query.cypher(
+        "MATCH (t:ReasoningTrace) WHERE toLower(t.task) CONTAINS toLower($topic) "
+        "OPTIONAL MATCH (t)-[:HAS_STEP]->(:ReasoningStep)-[:USES_TOOL]->(tc:ToolCall) "
+        "WITH t, collect(DISTINCT tc.tool_name) AS tools "
+        "RETURN t.task AS question, t.outcome AS outcome, tools "
+        "ORDER BY size(t.task) LIMIT 1",
+        {"topic": topic},
+    )
+    return rows[0] if rows else None
+
+
+async def find_affected(client: MemoryClient,
+                        source_name: str = COMPROMISED_SOURCE) -> list[str]:
+    """The reverse audit as ONE traversal over the SDK's `:TOUCHED` edges: every
+    decision whose reasoning touched the compromised source. A flat log would need a
+    scan of each record; the graph answers it with one query, at read time."""
+    rows = await client.query.cypher(
+        "MATCH (t:ReasoningTrace)-[:HAS_STEP]->(:ReasoningStep)"
+        "-[:TOUCHED]->(:Entity {name: $source}) "
+        "RETURN DISTINCT t.task AS decision ORDER BY decision",
+        {"source": source_name},
+    )
+    return [r["decision"] for r in rows]
+
+
+async def sources_touched(client: MemoryClient) -> list[dict]:
+    """Which sources each decision touched, the raw map behind the audit."""
+    rows = await client.query.cypher(
+        "MATCH (t:ReasoningTrace)-[:HAS_STEP]->(:ReasoningStep)-[:TOUCHED]->(e:Entity) "
+        "RETURN t.task AS decision, collect(DISTINCT e.name) AS sources ORDER BY decision"
+    )
+    return rows
+
+
+async def all_decisions(client: MemoryClient) -> list[str]:
+    """Every decision recorded, for reporting the total."""
+    rows = await client.query.cypher(
+        "MATCH (t:ReasoningTrace) RETURN t.task AS decision ORDER BY decision"
+    )
+    return [r["decision"] for r in rows]
+
+
+# ── Live recorder: a Strands HookProvider that writes to Neo4j as the agent runs ──
+def _run_async(coro):
+    """Run an async SDK call from Strands' synchronous hook callbacks. If a loop is
+    already running (notebook), run on a worker thread; otherwise asyncio.run.
+
+    We drain any pending tasks before the loop closes: the Neo4j SDK's HTTP client
+    schedules its teardown as a task, and letting asyncio.run close the loop first
+    prints a harmless 'Event loop is closed' traceback. Draining avoids that noise."""
+    async def _driver():
+        result = await coro
+        pending = [t for t in _asyncio.all_tasks() if t is not _asyncio.current_task()]
+        if pending:
+            await _asyncio.gather(*pending, return_exceptions=True)
+        return result
+
+    try:
+        _asyncio.get_running_loop()
+    except RuntimeError:
+        return _asyncio.run(_driver())
+    with _futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: _asyncio.run(_driver())).result()
+
+
+def _last_user_text(messages) -> str:
+    for m in reversed(messages or []):
+        if m.get("role") == "user":
+            for b in m.get("content", []):
+                if isinstance(b, dict) and "text" in b:
+                    return b["text"]
+    return ""
+
+
+class Neo4jDecisionRecorder(HookProvider):
+    """Records each live agent invocation as a reasoning trace in Neo4j, via the
+    official SDK. Attach with ``Agent(hooks=[Neo4jDecisionRecorder()])``.
+
+    This is where Strands and Neo4j meet. Strands emits lifecycle events with the data
+    already attached: ``AfterToolCallEvent`` carries ``event.tool_use`` (tool + input),
+    so the recorder never touches tool code. Neo4j's SDK takes those and stores them as
+    a connected, queryable trace. Zero changes to the tools; it captures whatever the
+    agent actually did.
+
+    Strands runs hook callbacks synchronously, and each ``agent(...)`` runs on its own
+    event loop. A Neo4j async client is bound to the loop that opened it, so the recorder
+    does NOT hold a long-lived client: it opens a fresh one per write, inside the same
+    loop that performs that write. That keeps every await on one loop.
+    """
+
+    def __init__(self, session_id: str = "live"):
+        self._session_id = session_id
+        self._question = None
+        self._tool_calls = []
+
+    def register_hooks(self, registry: HookRegistry, **kwargs) -> None:
+        registry.add_callback(BeforeInvocationEvent, self._on_start)
+        registry.add_callback(AfterToolCallEvent, self._on_tool)
+        registry.add_callback(AfterInvocationEvent, self._on_end)
+
+    def _on_start(self, event: BeforeInvocationEvent) -> None:
+        self._question = _last_user_text(event.messages)
+        self._tool_calls = []
+
+    def _on_tool(self, event: AfterToolCallEvent) -> None:
+        name = event.tool_use["name"]
+        self._tool_calls.append({
+            "tool": name,
+            "input": event.tool_use.get("input") or {},
+            "source": TOOL_SOURCE.get(name),   # which external source this tool read
+        })
+
+    def _on_end(self, event: AfterInvocationEvent) -> None:
+        if not self._question:
             return
-        threading.Event().wait(0.5)
+        outcome = str(event.result).strip()[:400]
+        _run_async(self._write(self._question, list(self._tool_calls), outcome))
+        self._question = None
 
-
-def reset_graph(driver, db: str) -> None:
-    """Remove this demo's nodes so a rerun starts clean (scoped to the demo's labels)."""
-    labels = "|".join(DEMO_LABELS)
-    with driver.session(database=db) as session:
-        session.run(f"MATCH (n:{labels}) DETACH DELETE n")
-
-
-def teardown_graph(driver, db: str) -> None:
-    """Full teardown: clear the demo's nodes, then DROP the isolated database entirely.
-
-    reset_graph() only clears the demo's labels (for rerun-safety). This removes the
-    whole `reasoningdemo` database so nothing this demo created is left behind.
-    Guarded: never drops the shared default database (the Community fallback).
-    """
-    reset_graph(driver, db)
-    if db == DEFAULT_DATABASE:
-        print(f"  running on the default database '{db}'; leaving it in place (only cleared this demo's nodes).")
-        return
-    with driver.session(database="system") as session:
-        session.run(f"DROP DATABASE {db} IF EXISTS")
-    print(f"  dropped database '{db}' (full teardown).")
-
-
-
-# ── Writing traces as graph chains ────────────────────────────────────────────
-def write_trace(driver, db: str, trace: dict) -> None:
-    """Store one decision trace as a node chain with evidence provenance.
-
-    Every evidence record's ``source`` either names an external :Source (origin) or
-    another :Evidence record (derivation), the same field the flat store keeps, but
-    here it becomes a traversable edge instead of a string inside a blob.
-    """
-    with driver.session(database=db) as session:
-        session.run(
-            "MERGE (d:Decision {id: $id}) SET d.question = $question, d.outcome = $outcome",
-            id=trace["id"], question=trace["question"], outcome=trace["outcome"],
-        )
-        previous_step = None
-        for step in trace["steps"]:
-            step_id = f"{trace['id']}-step-{step['n']}"
-            session.run(
-                "MATCH (d:Decision {id: $did}) "
-                "MERGE (s:Step {id: $sid}) SET s.n = $n, s.tool = $tool, s.input = $input "
-                "MERGE (d)-[:HAS_STEP]->(s)",
-                did=trace["id"], sid=step_id, n=step["n"], tool=step["tool"],
-                input=str(step["input"]),
-            )
-            if previous_step:
-                session.run(
-                    "MATCH (a:Step {id: $prev}), (b:Step {id: $curr}) MERGE (a)-[:NEXT]->(b)",
-                    prev=previous_step, curr=step_id,
-                )
-            previous_step = step_id
-
-            evidence = step["evidence"]
-            session.run(
-                "MATCH (s:Step {id: $sid}) "
-                "MERGE (e:Evidence {name: $name}) SET e.text = $text "
-                "MERGE (s)-[:USED]->(e)",
-                sid=step_id, name=evidence["name"], text=evidence["text"],
-            )
-            if evidence["source"] in EXTERNAL_SOURCES:
-                session.run(
-                    "MATCH (e:Evidence {name: $name}) "
-                    "MERGE (src:Source {name: $source}) "
-                    "MERGE (e)-[:FROM_SOURCE]->(src)",
-                    name=evidence["name"], source=evidence["source"],
-                )
-            else:
-                session.run(
-                    "MATCH (e:Evidence {name: $name}) "
-                    "MERGE (parent:Evidence {name: $source}) "
-                    "MERGE (e)-[:DERIVED_FROM]->(parent)",
-                    name=evidence["name"], source=evidence["source"],
-                )
-
-
-def seed_graph(driver, db: str) -> dict:
-    """Write the shared seeded decision history into the graph. Returns a summary."""
-    for trace in SEED_TRACES:
-        write_trace(driver, db, trace)
-    with driver.session(database=db) as session:
-        counts = session.run(
-            "MATCH (d:Decision) WITH count(d) AS decisions "
-            "MATCH (e:Evidence) WITH decisions, count(e) AS evidence "
-            "MATCH (s:Source) RETURN decisions, evidence, count(s) AS sources"
-        ).single()
-    return dict(counts)
-
-
-# ── The queries (deterministic, plain Cypher, no LLM judge) ─────────────────
-def replay_why_graph(driver, db: str, topic: str) -> dict | None:
-    """Answer "why did I decide X?" by walking the decision's step chain.
-
-    Several decisions may mention the topic (a budget that includes the flight, the
-    decision that chose it, ...). Rank matches by where the topic first appears in the
-    outcome, the decision *about* X mentions it earliest, so the pick is deterministic.
-    """
-    with driver.session(database=db) as session:
-        row = session.run(
-            "MATCH (d:Decision) "
-            "WHERE toLower(d.outcome) CONTAINS toLower($topic) "
-            "   OR toLower(d.question) CONTAINS toLower($topic) "
-            "MATCH (d)-[:HAS_STEP]->(s:Step)-[:USED]->(e:Evidence) "
-            "RETURN d.id AS id, d.question AS question, d.outcome AS outcome, "
-            "       collect({n: s.n, tool: s.tool, input: s.input, evidence: e.text}) AS steps "
-            # Text before the first occurrence of the topic; absent → full length (ranks last).
-            "ORDER BY size(split(toLower(d.outcome), toLower($topic))[0]), id LIMIT 1",
-            topic=topic,
-        ).single()
-    if row is None:
-        return None
-    trace = dict(row)
-    trace["steps"] = sorted(trace["steps"], key=lambda s: s["n"])
-    return trace
-
-
-def find_affected_decisions_graph(driver, db: str, source_name: str = COMPROMISED_SOURCE) -> list:
-    """The reverse audit as ONE traversal: every decision whose evidence chain reaches
-    the compromised source, directly or through any depth of derived evidence.
-
-    ``DERIVED_FROM*0..`` is the part a flat scan cannot express: length 0 covers
-    evidence taken straight from the source, and longer paths follow provenance through
-    decisions that only depended on the source via other decisions' outputs.
-    """
-    with driver.session(database=db) as session:
-        rows = session.run(
-            "MATCH (d:Decision)-[:HAS_STEP]->(:Step)-[:USED]->(:Evidence)"
-            "      -[:DERIVED_FROM*0..]->(:Evidence)-[:FROM_SOURCE]->(src:Source {name: $source}) "
-            "RETURN DISTINCT d.id AS id ORDER BY id",
-            source=source_name,
-        )
-        return [row["id"] for row in rows]
-
-
-def provenance_path(driver, db: str, decision_id: str, source_name: str = COMPROMISED_SOURCE) -> list:
-    """Return one shortest evidence path from a decision to the source, as readable hops.
-
-    This is the audit's receipt: not just "this decision is affected" but the exact
-    chain of evidence that connects it to the compromised source.
-    """
-    with driver.session(database=db) as session:
-        row = session.run(
-            "MATCH (d:Decision {id: $id}), (src:Source {name: $source}) "
-            "MATCH path = shortestPath("
-            "  (d)-[:HAS_STEP|USED|DERIVED_FROM|FROM_SOURCE*..10]->(src)) "
-            "RETURN [n IN nodes(path) | coalesce(n.id, n.name)] AS hops",
-            id=decision_id, source=source_name,
-        ).single()
-    return row["hops"] if row else []
+    async def _write(self, question, tool_calls, outcome) -> None:
+        # Open a client inside THIS loop (the one _run_async created), so every await
+        # runs on a single event loop. Never reuse a client from another loop.
+        async with memory_client() as client:
+            trace = await client.reasoning.start_trace(
+                session_id=self._session_id, task=question)
+            for call in tool_calls:
+                rs = await client.reasoning.add_step(
+                    trace.id, thought=f"Call {call['tool']}", action=f"invoke {call['tool']}")
+                touched = None
+                src = call.get("source")
+                if src:
+                    ent, _ = await client.long_term.add_entity(src, entity_type="Source")
+                    touched = [EntityRef(id=str(ent.id), name=src, type="Source")]
+                await client.reasoning.record_tool_call(
+                    rs.id, call["tool"], call["input"], touched_entities=touched)
+            await client.reasoning.complete_trace(
+                trace.id, outcome=outcome, success=True)

@@ -84,7 +84,7 @@ agent = Agent(
 )
 ```
 
-`remember_fact` is the write path: it passes one plain-English sentence to the same `SimpleKGPipeline`, so a new fact is extracted into graph nodes and edges the same way the graph was first built, then answerable by traversal.
+`remember_fact` is how a new fact gets saved: it passes one plain-English sentence to the same `SimpleKGPipeline`, so the fact is extracted into graph nodes and edges the same way the graph was first built, then answerable by traversal.
 
 `recall_graph` and `recall_semantic` are thin wrappers over the two `neo4j-graphrag` retriever classes (`VectorCypherRetriever` and `VectorRetriever`), so no custom retrieval code is needed. The system prompt is role-only; each tool's purpose lives in its docstring.
 

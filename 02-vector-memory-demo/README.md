@@ -140,7 +140,7 @@ client.query_vectors(..., queryVector={"float32": qv}, topK=3,
 
 ### When semantic search earns its keep
 
-For 10 memories, dump-all is still cheap (~650 chars). Semantic search pays off as memory **grows**: hundreds of notes means thousands of tokens per question with dump-all, while semantic top-3 stays constant. The retrieval cost that doesn't shrink: **embedding the question** (~0.5 s with Titan V2). Budget for it in latency-sensitive paths regardless of backend.
+For 10 memories, dumping every note into the prompt still costs little (~650 chars). Semantic search pays off as memory **grows**: hundreds of notes means thousands of tokens per question with dump-all, while semantic top-3 stays constant. The retrieval cost that doesn't shrink: **embedding the question** (~0.5 s with Titan V2). Budget for it in latency-sensitive paths regardless of backend.
 
 ### Multi-tenant production note
 

@@ -117,6 +117,41 @@ LIMIT 5
 """
 
 
+# ── Neo4j Browser queries to SEE the memory graph ────────────────────────────
+# Paste these into Neo4j Browser after selecting the demo database
+# (`:use memorydemo`, or the default database on Neo4j Community) and running the
+# demo so the graph exists. They RETURN paths, so the Browser draws the edges; if
+# you only return nodes, turn on "Connect result nodes" in the Browser settings.
+VISUALIZE_QUERIES = {
+    "knowledge_graph": (
+        "// The whole knowledge graph the agent remembers: people, airlines,\n"
+        "// alliances, cities, countries and the typed edges between them.\n"
+        "MATCH p = (:Person)-[:WORKS_AT|MEMBER_OF|FLIES_TO|IN_COUNTRY]->()\n"
+        "RETURN p\n"
+        "UNION\n"
+        "MATCH p = (:Airline)-[:MEMBER_OF|FLIES_TO]->()\n"
+        "RETURN p\n"
+        "UNION\n"
+        "MATCH p = (:City)-[:IN_COUNTRY]->()\n"
+        "RETURN p"
+    ),
+    "multihop_chain": (
+        "// The multi-hop answer as a path: from a person to Spain, the chain a\n"
+        "// traversal walks that pure similarity cannot. Maya -> Iberia -> Madrid -> Spain.\n"
+        "MATCH p = (person:Person)-[:WORKS_AT|MEMBER_OF|FLIES_TO|IN_COUNTRY*1..5]-"
+        "(c:Country {name: \"Spain\"})\n"
+        "RETURN p\n"
+        "ORDER BY length(p)\n"
+        "LIMIT 5"
+    ),
+    "one_person": (
+        "// Everything connected to one person, at any depth up to 4 hops.\n"
+        "MATCH p = (person:Person {name: \"Maya Torres\"})-[*1..4]-()\n"
+        "RETURN p"
+    ),
+}
+
+
 def _valid_identifier(name: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name))
 

@@ -17,7 +17,7 @@ These demos use Strands Agents for implementation.
 |------|-------------|-------|
 | [01 - Key-Value Memory](01-key-value-memory-demo/) | Stop your agent from forgetting user preferences: the same 3-turn conversation climbing the durability ladder, no memory → `agent.state` → local disk → Amazon S3. Real flight data (Duffel); the only variable is where memory lives. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-agent.state-blue) |
 | [02 - Vector Memory](02-vector-memory-demo/) | Do you need a vector database for agent memory? Prototype semantic search in-process with FAISS, then move to a managed store that survives restarts: Amazon S3 Vectors. Same Titan V2 embeddings (1024 dims), same answer against a key-value baseline. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![AWS](https://img.shields.io/badge/AWS-S3_Vectors-orange) ![Strands](https://img.shields.io/badge/Strands-memory-blue) |
-| [03 - Graph Memory](03-graph-memory-demo/) | Vector memory can't reason over relationships. Store memories as a Neo4j knowledge graph and traverse it to answer multi-hop questions: before 1/4, after 4/4. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-tools+state-blue) |
+| [03 - Graph Memory](03-graph-memory-demo/) | Vector memory can't reason over relationships. Store memories as a Neo4j knowledge graph and traverse it to answer multi-hop questions: before 1/4, after 4/4. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-MemoryManager-blue) |
 | [04 - Selective Memory](04-selective-memory-demo/) | What to store and what to throw away. The winning agent keeps the right things and drops the rest. Three selection mechanisms measured against the same conversation: one prompt you own, four typed stores, and Amazon Bedrock AgentCore Memory (managed), scored on selection recall and who controls the keep/throw-away policy. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Strands](https://img.shields.io/badge/Strands-core_memory-blue) |
 | [05 - Memory Hygiene](05-memory-hygiene-demo/) | What an agent should NOT remember. A write-gate blocks poisoned/injected content; forget removes it. One poisoned fact skews 1 lookup in key-value memory but hijacks 4/4 booking decisions in a graph. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-graph_memory-blue) ![Strands](https://img.shields.io/badge/Strands-write_gate-blue) |
 | [06 - Reasoning Memory](06-reasoning-memory-demo/) | Remember WHY the agent decided, not just what it knows. A HookProvider records each live decision automatically, into `agent.state` (flat) or Neo4j via the official agent-memory SDK; when a source turns out wrong, one `:TOUCHED` traversal finds every decision that touched it, where a flat store scans every record. | ![Python](https://img.shields.io/badge/Python-3.9+-green) ![Neo4j](https://img.shields.io/badge/Neo4j-agent_memory_SDK-blue) ![Strands](https://img.shields.io/badge/Strands-hooks-blue) |
@@ -28,7 +28,7 @@ These demos use Strands Agents for implementation.
 
 ## Two principles across every demo
 
-**The control lives in the agent's harness.** Memory is not bolted on beside the agent; it runs through the agent's own mechanisms: [`agent.state`](https://strandsagents.com/docs/user-guide/concepts/agents/state/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) and session managers (Demo 01), the [`MemoryManager`](https://strandsagents.com/docs/user-guide/concepts/memory/overview/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) and its stores (Demos 02, 04, 05), [tools](https://strandsagents.com/docs/user-guide/concepts/tools/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) (Demo 03), and [hooks](https://strandsagents.com/docs/user-guide/concepts/agents/hooks/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) (Demo 06). Nothing that decides what the agent remembers sits outside the agent.
+**The control lives in the agent's harness.** Memory is not bolted on beside the agent; it runs through the agent's own mechanisms: [`agent.state`](https://strandsagents.com/docs/user-guide/concepts/agents/state/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) and session managers (Demo 01), the [`MemoryManager`](https://strandsagents.com/docs/user-guide/concepts/memory/overview/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) and its stores (Demos 02, 03, 04, 05), [tools](https://strandsagents.com/docs/user-guide/concepts/tools/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el), and [hooks](https://strandsagents.com/docs/user-guide/concepts/agents/hooks/?trk=87c4c426-cddf-4799-a299-273337552ad8&sc_channel=el) (Demo 06). Nothing that decides what the agent remembers sits outside the agent.
 
 **Deterministic vs model-based.** Each demo separates the two. Deterministic code (storage, cosine similarity, Cypher traversal, regex screens, recall scoring, control flow) returns the same output for the same input. Model-based steps (the agent, `ModelExtractor`, the write-gate classifier, `SimpleKGPipeline`, and the embeddings) are neural-network inference, which carries no reproducibility guarantee: identical inputs can diverge across runs from floating-point non-associativity and batching, even under greedy decoding ([Enabling Determinism in LLM Inference](https://arxiv.org/abs/2601.17768), 2026). Each demo's note says which steps are which, so you know what reproduces and what does not.
 
@@ -91,10 +91,11 @@ Semantic search finds *similar* memories but can't connect them. A question like
 | `VectorCypherRetriever` (after) | Similarity + traversal | 4/4 |
 
 ```python
-# Plugging a graph store into a Strands agent is just tools + state
+# Graph memory is a native MemoryStore wired through the MemoryManager
 agent = Agent(
     model=MODEL,
-    tools=[recall_graph, recall_semantic, remember_fact],
+    tools=[search_flights, book_flight, best_time_to_visit],   # domain tools only
+    memory_manager=MemoryManager(stores=[GraphMemoryStore(mode="graph", ...)]),
 )
 ```
 

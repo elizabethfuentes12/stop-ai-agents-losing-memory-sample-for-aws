@@ -36,32 +36,44 @@ if not os.getenv("OPENAI_API_KEY"):
 from strands import Agent
 # Using OpenAI-compatible interface via Strands SDK (not direct OpenAI usage)
 from strands.models.openai import OpenAIModel
+from strands.memory import MemoryManager, ModelExtractor, ExtractionConfig, IntervalTrigger
 
 import graph_memory as gm
 import travel_tools as tt
+from graph_memory_store import GraphMemoryStore
 import asyncio
 
 print("Connecting to Neo4j and building memory (LLM extraction)...")
 driver, db, embedder = asyncio.run(gm.build())
-tt.init_memory(driver=driver, db=db, embedder=embedder)
 
 MODEL = OpenAIModel(model_id="gpt-4o-mini")
+
+# Same GraphMemoryStore and MemoryManager as chat_graph.py, but mode="semantic":
+# recall is similarity over chunks only, no traversal. This is the contrast, the
+# agent can recall individual facts but cannot follow relationships to connect them.
+SELECTION_PROMPT = (
+    "Extract durable facts worth keeping about the traveler and their network. "
+    'Return ONLY a JSON array of {"content": string}, or [] if nothing is worth keeping.'
+)
+semantic_store = GraphMemoryStore(
+    name="traveler_semantic", driver=driver, db=db, embedder=embedder, mode="semantic",
+    extraction=ExtractionConfig(
+        trigger=[IntervalTrigger(turns=1)],
+        extractor=ModelExtractor(model=MODEL, system_prompt=SELECTION_PROMPT),
+    ),
+)
 
 agent = Agent(
     model=MODEL,
     system_prompt="You are a personal travel assistant. Be concise: at most 3 sentences.",
-    tools=[
-        tt.search_flights,
-        tt.best_time_to_visit,
-        tt.recall_semantic,
-        tt.remember_fact,
-    ],
+    tools=[tt.search_flights, tt.best_time_to_visit],
+    memory_manager=MemoryManager(stores=[semantic_store]),
     callback_handler=None,
 )
 
 print("\n" + "=" * 60)
-print("  TRAVEL ASSISTANT, semantic memory")
-print("  recall_semantic · remember_fact · search_flights")
+print("  TRAVEL ASSISTANT, semantic memory (MemoryManager)")
+print("  search_memory (similarity only) · auto-extraction · injection")
 print("=" * 60)
 print(__doc__)
 
@@ -79,13 +91,15 @@ try:
             break
 
         if user_input.lower() == "/memory":
-            remembered = agent.state.get("remembered_facts") or []
-            if remembered:
-                print("Facts stored this session:")
-                for f in remembered:
-                    print(f"  {f['subject']} -[{f['relation']}]-> {f['object']}")
-            else:
-                print("No facts stored this session yet.")
+            with driver.session(database=db) as session:
+                rows = session.run(
+                    "MATCH (c:Chunk) RETURN c.text AS text ORDER BY text"
+                ).data()
+            print(f"\nStored chunks ({len(rows)}):")
+            for row in rows:
+                print(f"  - {row['text']}")
+            if not rows:
+                print("  (empty)")
             continue
 
         if user_input.lower() == "/help":

@@ -37,35 +37,47 @@ if not os.getenv("OPENAI_API_KEY"):
 from strands import Agent
 # Using OpenAI-compatible interface via Strands SDK (not direct OpenAI usage)
 from strands.models.openai import OpenAIModel
+from strands.memory import MemoryManager, ModelExtractor, ExtractionConfig, IntervalTrigger
 
 import asyncio
 
 import graph_memory as gm
 import travel_tools as tt
+from graph_memory_store import GraphMemoryStore
 
 print("Connecting to Neo4j and building memory (LLM extraction)...")
 driver, db, embedder = asyncio.run(gm.build())
-tt.init_memory(driver=driver, db=db, embedder=embedder)
 
 MODEL = OpenAIModel(model_id="gpt-4o-mini")
+
+# Graph memory as a native Strands MemoryStore, wired through the MemoryManager,
+# exactly like the vector store in Demo 04. The manager registers a search tool,
+# runs extraction after each turn (facts the user reveals become graph nodes/edges),
+# and injects recalled memories into the model. mode="graph" recalls by traversal.
+SELECTION_PROMPT = (
+    "Extract durable facts worth keeping about the traveler and their network: "
+    "who knows whom, who works where, which airline flies where, where a city is. "
+    'Return ONLY a JSON array of {"content": string}, or [] if nothing is worth keeping.'
+)
+graph_store = GraphMemoryStore(
+    name="traveler_graph", driver=driver, db=db, embedder=embedder, mode="graph",
+    extraction=ExtractionConfig(
+        trigger=[IntervalTrigger(turns=1)],
+        extractor=ModelExtractor(model=MODEL, system_prompt=SELECTION_PROMPT),
+    ),
+)
 
 agent = Agent(
     model=MODEL,
     system_prompt="You are a personal travel assistant. Be concise: at most 3 sentences.",
-    tools=[
-        tt.search_flights,
-        tt.book_flight,
-        tt.best_time_to_visit,
-        tt.recall_graph,
-        tt.recall_semantic,
-        tt.remember_fact,
-    ],
+    tools=[tt.search_flights, tt.book_flight, tt.best_time_to_visit],
+    memory_manager=MemoryManager(stores=[graph_store]),
     callback_handler=None,
 )
 
 print("\n" + "=" * 60)
-print("  TRAVEL ASSISTANT, graph memory")
-print("  recall_graph · recall_semantic · remember_fact")
+print("  TRAVEL ASSISTANT, graph memory (MemoryManager)")
+print("  search_memory (traversal) · auto-extraction · injection")
 print("  search_flights · book_flight · best_time_to_visit")
 print("=" * 60)
 print(__doc__)
@@ -105,13 +117,7 @@ try:
             break
 
         if user_input.lower() == "/memory":
-            remembered = agent.state.get("remembered_facts") or []
-            if remembered:
-                print("Facts stored this session:")
-                for f in remembered:
-                    print(f"  {f['subject']} -[{f['relation']}]-> {f['object']}")
-            else:
-                print("No facts stored this session yet.")
+            _show_graph()
             continue
 
         if user_input.lower() == "/graph":

@@ -65,6 +65,21 @@ SCORECARD = [
 ]
 
 
+def _agent_with_memory(driver, db, embedder, mode):
+    """Build an Agent whose memory is a GraphMemoryStore wired through the MemoryManager."""
+    from strands.memory import MemoryManager
+    from graph_memory_store import GraphMemoryStore
+    store = GraphMemoryStore(name=f"traveler_{mode}", driver=driver, db=db,
+                             embedder=embedder, mode=mode)
+    agent = Agent(
+        model=MODEL,
+        system_prompt="You are a personal travel assistant with access to the user's travel memory. Be concise.",
+        memory_manager=MemoryManager(stores=[store]),
+        callback_handler=None,
+    )
+    return agent, store
+
+
 def run_test_1_semantic(driver, db, embedder):
     """Test 1: Agent with semantic-only recall. Vector similarity alone cannot answer
     a multi-hop question, it surfaces related pieces but never connects them to a person."""
@@ -72,14 +87,7 @@ def run_test_1_semantic(driver, db, embedder):
     print("TEST 1: AGENT WITH SEMANTIC RECALL, vector similarity only, no traversal")
     print("=" * 70)
 
-    tt.init_memory(driver=driver, db=db, embedder=embedder)
-
-    agent = Agent(
-        model=MODEL,
-        system_prompt="You are a personal travel assistant with access to the user's travel memory. Be concise.",
-        tools=[tt.recall_semantic],
-        callback_handler=None,
-    )
+    agent, _ = _agent_with_memory(driver, db, embedder, mode="semantic")
 
     print(f"\nQuestion: {QUESTION}\n")
     resp = agent(QUESTION)
@@ -100,14 +108,7 @@ def run_test_2_graph(driver, db, embedder):
     print("TEST 2: AGENT WITH GRAPH RECALL, vector similarity + graph traversal")
     print("=" * 70)
 
-    tt.init_memory(driver=driver, db=db, embedder=embedder)
-
-    agent = Agent(
-        model=MODEL,
-        system_prompt="You are a personal travel assistant with access to the user's travel memory. Be concise.",
-        tools=[tt.recall_graph],
-        callback_handler=None,
-    )
+    agent, _ = _agent_with_memory(driver, db, embedder, mode="graph")
 
     print(f"\nQuestion: {QUESTION}\n")
     resp = agent(QUESTION)
@@ -122,18 +123,33 @@ def run_test_2_graph(driver, db, embedder):
 
 
 def run_test_3_agent(driver, db, embedder):
-    """Test 3: A full Strands agent that uses graph memory, and writes a new fact back."""
+    """Test 3: A full Strands agent that uses graph memory (MemoryManager), and writes
+    a new fact back through automatic extraction."""
     print("\n" + "=" * 70)
-    print("TEST 3: FULL STRANDS AGENT WITH GRAPH MEMORY")
+    print("TEST 3: FULL STRANDS AGENT WITH GRAPH MEMORY (MemoryManager)")
     print("=" * 70)
 
-    tt.init_memory(driver=driver, db=db, embedder=embedder)
+    from strands.memory import MemoryManager, ModelExtractor, ExtractionConfig, IntervalTrigger
+    from graph_memory_store import GraphMemoryStore
 
+    store = GraphMemoryStore(
+        name="traveler_graph", driver=driver, db=db, embedder=embedder, mode="graph",
+        extraction=ExtractionConfig(
+            trigger=[IntervalTrigger(turns=1)],
+            extractor=ModelExtractor(
+                model=MODEL,
+                system_prompt=(
+                    "Extract durable facts about the traveler and their network. "
+                    'Return ONLY a JSON array of {"content": string}, or [] if nothing.'
+                ),
+            ),
+        ),
+    )
     agent = Agent(
         model=MODEL,
-        system_prompt="You are a personal travel assistant with access to the user's travel memory. Always store new facts the user shares. Be concise.",
-        tools=[tt.search_flights, tt.book_flight, tt.best_time_to_visit,
-               tt.recall_graph, tt.recall_semantic, tt.remember_fact],
+        system_prompt="You are a personal travel assistant with access to the user's travel memory. Be concise.",
+        tools=[tt.search_flights, tt.book_flight, tt.best_time_to_visit],
+        memory_manager=MemoryManager(stores=[store]),
         callback_handler=None,
     )
 
@@ -143,19 +159,15 @@ def run_test_3_agent(driver, db, embedder):
     answer = resp.message["content"][0]["text"]
     print(f"  Agent: {answer.strip()[:220]}")
 
-    # Turn 2: teach the agent a new fact, it writes an edge into the graph.
-    teach = "By the way, remember that Maya Torres works at Iberia, she's my contact there."
-    print(f"\nTurn 2 (write): {teach}")
+    # Turn 2: teach the agent a new fact; extraction writes it into the graph.
+    teach = "By the way, remember that Diego Fuentes works at Lufthansa, he's my contact there."
+    print(f"\nTurn 2 (write via extraction): {teach}")
     resp = agent(teach)
     print(f"  Agent: {resp.message['content'][0]['text'].strip()[:220]}")
 
-    remembered = agent.state.get("remembered_facts") or []
-    print(f"\n  Facts the agent logged to agent.state this session: {len(remembered)}")
-    for f in remembered:
-        print(f"    {f['subject']} -[{f['relation']}]-> {f['object']}")
-
     recovered = "Maya" in answer
-    return {"strategy": "agent + graph", "recovered": recovered, "facts_written": len(remembered)}
+    return {"strategy": "agent + graph (MemoryManager)", "recovered": recovered}
+
 
 
 def run_test_4_scorecard(driver, db, embedder):

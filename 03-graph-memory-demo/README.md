@@ -15,7 +15,7 @@ This demo uses [Strands Agents](https://github.com/strands-agents/sdk-python) fo
 
 > **Official integration.** This demo wires the two `neo4j-graphrag` retrievers by hand on purpose, to expose the retrieval mechanics (the `VectorRetriever` vs `VectorCypherRetriever` contrast is the whole point). For production, Neo4j Labs ships an official Strands integration, [`neo4j-agent-memory`](https://neo4j.com/labs/agent-memory/how-to/integrations/aws-strands/), that provides a `Neo4jSessionManager` you attach with `Agent(session_manager=...)` to auto-persist turns and inject graph memories. It is a Neo4j Labs package (community-supported), not part of the Strands SDK core, and it hides the low-level retrieval this demo teaches.
 
-![Graph memory architecture: Strands agent takes two paths. recall_semantic returns pieces (1/4), recall_graph traverses Maya Torres → Iberia → Madrid → Spain (4/4)](images/ai-agent-graph-memory-architecture.png)
+![Graph memory architecture: a Strands agent recalls through a MemoryManager. Semantic mode returns pieces (1/4); graph mode traverses Maya Torres → Iberia → Madrid → Spain (4/4)](images/ai-agent-graph-memory-architecture.png)
 
 ---
 
@@ -43,12 +43,12 @@ The answer, **Maya Torres**, is never stated directly. You can only reach it by 
 
 ### Semantic recall vs graph recall: same graph, same agent harness
 
-| Retriever strategy | How it works | Result on the multi-hop question |
+| Recall mode | How it works | Result on the multi-hop question |
 |--------------------|-------------|----------------------------------|
-| **Semantic recall** (`recall_semantic`) | `VectorRetriever`: similarity over chunks | Returns the matching text fragments (`Madrid is in Spain.`, `Maya Torres works at Iberia.`). **Never connects them to a person.** |
-| **Graph recall** (`recall_graph`) | `VectorCypherRetriever`: similarity → Cypher traversal | Matches an entry chunk, walks into the entities extracted from it, and returns the person plus the chain: **Maya Torres → Iberia → Madrid → Spain.** |
+| **Semantic** (`GraphMemoryStore(mode="semantic")`) | `VectorRetriever`: similarity over chunks | Returns the matching text fragments (`Madrid is in Spain.`, `Maya Torres works at Iberia.`). **Never connects them to a person.** |
+| **Graph** (`GraphMemoryStore(mode="graph")`) | `VectorCypherRetriever`: similarity → Cypher traversal | Matches an entry chunk, walks into the entities extracted from it, and returns the person plus the chain: **Maya Torres → Iberia → Madrid → Spain.** |
 
-Both strategies receive the **same text** and share the **same chunk vector index**. The graph wins because the LLM extracted *connected entities* from the text, not because it's handed the answer. The advantage is structural.
+Both modes receive the **same text** and share the **same chunk vector index**. The graph wins because the LLM extracted *connected entities* from the text, not because it's handed the answer. The advantage is structural.
 
 ![Multi-hop question over agent memory: vector similarity surfaces Iberia, Madrid and Spain as disconnected pieces; graph traversal walks the edges back to Maya Torres](images/ai-agent-multihop-vector-vs-graph.png)
 
@@ -58,9 +58,9 @@ Both strategies receive the **same text** and share the **same chunk vector inde
 
 | Test | What it does | Recovers the multi-hop answer? |
 |------|--------------|-------------------------------|
-| **1. Agent: semantic recall only** | Agent with `recall_semantic`: similarity over chunks, no traversal | No |
-| **2. Agent: graph recall** | Agent with `recall_graph`: similarity + graph traversal | Yes |
-| **3. Full travel agent** | Agent with all 6 tools: searches flights, books, recalls, and grows the graph via `remember_fact` | Yes |
+| **1. Agent: semantic recall** | Agent with `GraphMemoryStore(mode="semantic")` via `MemoryManager`: similarity over chunks, no traversal | No |
+| **2. Agent: graph recall** | Agent with `GraphMemoryStore(mode="graph")` via `MemoryManager`: similarity + graph traversal | Yes |
+| **3. Full travel agent** | Agent with the travel tools plus graph memory through `MemoryManager`; a new fact is stored by automatic extraction | Yes |
 | **4. Deterministic scorecard** | 4 multi-hop questions, semantic vs graph, checked against the known graph | semantic **1/4**, graph **4/4** |
 
 The scorecard is a deterministic check against the known graph (**not** an LLM judge), so the numbers are reproducible.
@@ -69,24 +69,33 @@ The scorecard is a deterministic check against the known graph (**not** an LLM j
 
 ## The Strands angle (the harness)
 
-Plugging an external graph store into a full travel agent is *just tools + state* with Strands. Six tools split into two groups:
+Graph memory is a native Strands `MemoryStore` wired through the `MemoryManager`, exactly like the vector store in Demo 04. You don't hand-write recall tools: the manager registers the recall tool, runs extraction after each turn, and injects recalled memories into the model.
 
 ```python
+from strands.memory import MemoryManager, ModelExtractor, ExtractionConfig, IntervalTrigger
+from graph_memory_store import GraphMemoryStore
+
+store = GraphMemoryStore(
+    name="traveler_graph", driver=driver, db=db, embedder=embedder, mode="graph",
+    extraction=ExtractionConfig(
+        trigger=[IntervalTrigger(turns=1)],
+        extractor=ModelExtractor(model=MODEL, system_prompt=SELECTION_PROMPT),
+    ),
+)
+
 agent = Agent(
     model=MODEL,
     system_prompt="You are a personal travel assistant. Be concise: at most 3 sentences.",
-    tools=[
-        # Travel tools: what the assistant does
-        search_flights, book_flight, best_time_to_visit,
-        # Memory tools: how the assistant remembers
-        recall_graph, recall_semantic, remember_fact,
-    ],
+    tools=[search_flights, book_flight, best_time_to_visit],  # domain tools only
+    memory_manager=MemoryManager(stores=[store]),             # memory is the framework's job
 )
 ```
 
-`remember_fact` is how a new fact gets saved: it passes one plain-English sentence to the same `SimpleKGPipeline`, so the fact is extracted into graph nodes and edges the same way the graph was first built, then answerable by traversal.
+`GraphMemoryStore` implements the native `MemoryStore` contract (`search` + `add`) over `neo4j-graphrag`:
+- **`add`** runs the same `SimpleKGPipeline` that built the graph, so a new fact becomes typed nodes and edges against the pinned schema. Automatic extraction calls it after each turn.
+- **`search`** in `mode="graph"` is `VectorCypherRetriever` (similarity → traversal); in `mode="semantic"` it is `VectorRetriever` (similarity only), which is the contrast Demo shows.
 
-`recall_graph` and `recall_semantic` are thin wrappers over the two `neo4j-graphrag` retriever classes (`VectorCypherRetriever` and `VectorRetriever`), so no custom retrieval code is needed. The system prompt is role-only; each tool's purpose lives in its docstring.
+The `MemoryManager` owns *when* to extract (triggers), *how* to extract (the `ModelExtractor` prompt), the recall tool, and injection. The agent code stays domain tools + one `memory_manager=`.
 
 ---
 
@@ -140,9 +149,10 @@ uv run python chat_semantic.py
 | `test_graph_memory.py` | Main demo: 4 agent tests + scorecard comparison table |
 | `test_graph_memory.ipynb` | Interactive notebook walkthrough |
 | `graph_memory.py` | Graph memory layer: Neo4j connection, isolated `memorydemo` database, `SimpleKGPipeline` (LLM extraction) against the pinned schema, chunk vector index, `make_semantic_retriever`, `make_graph_retriever` |
-| `travel_tools.py` | Strands `@tool`s. **Travel:** `search_flights`, `book_flight`, `best_time_to_visit` · **Memory:** `remember_fact` (feeds the extraction pipeline), `recall_semantic`, `recall_graph` |
-| `chat_graph.py` | Interactive CLI with graph recall (`recall_graph` + all tools) |
-| `chat_semantic.py` | Interactive CLI with semantic recall only (`recall_semantic`) |
+| `graph_memory_store.py` | `GraphMemoryStore`: a native Strands `MemoryStore` over Neo4j (`search` + `add`), `mode="graph"` (traversal) or `mode="semantic"` (similarity only) |
+| `travel_tools.py` | Domain `@tool`s only: `search_flights`, `book_flight`, `best_time_to_visit`. Memory is the `MemoryManager`'s job, not a tool |
+| `chat_graph.py` | Interactive CLI: graph memory via `MemoryManager(stores=[GraphMemoryStore(mode="graph")])` |
+| `chat_semantic.py` | Interactive CLI: the contrast, `mode="semantic"` (similarity only) |
 | `flights_api.py` | Duffel sandbox flight search with offline fallback |
 | `weather_api.py` | Open-Meteo historical climate data |
 | `fallback_offers.json` | Captured real offers for offline resilience |
@@ -182,16 +192,18 @@ create_vector_index(driver, "chunk_embeddings", label="Chunk",
                     similarity_fn="cosine", neo4j_database=db)
 ```
 
-### 3. Two retrieval strategies, wrapped as Strands tools
+### 3. Two retrieval strategies, behind one native MemoryStore
+
+`GraphMemoryStore` implements the Strands `MemoryStore` contract (`search` + `add`). Its `search` picks the retriever by `mode`:
 
 ```python
 from neo4j_graphrag.retrievers import VectorRetriever, VectorCypherRetriever
 
-# recall_semantic: similarity over chunks, returns the matching text fragments only
+# mode="semantic": similarity over chunks, returns the matching text fragments only
 semantic_retriever = VectorRetriever(driver, "chunk_embeddings", embedder=embedder,
                                      return_properties=["text"], neo4j_database=db)
 
-# recall_graph: similarity → traversal. From the matched Chunk, step into the entities
+# mode="graph": similarity → traversal. From the matched Chunk, step into the entities
 # extracted from it (FROM_CHUNK), find a Person, and return the shortest path.
 RETRIEVAL_QUERY = """
 WITH node AS chunk, score
@@ -208,19 +220,19 @@ graph_retriever = VectorCypherRetriever(driver, "chunk_embeddings", RETRIEVAL_QU
                                         embedder=embedder, neo4j_database=db)
 ```
 
-This "vector search then expand through the graph" is the documented graph-RAG pattern.
+This "vector search then expand through the graph" is the documented graph-RAG pattern. The `MemoryManager` calls the store's `search` for you and registers the recall tool; you never wire a retrieval tool by hand.
 
-### 4. remember_fact grows the graph through the same pipeline
+### 4. Writing a fact grows the graph through the same pipeline
 
-New facts are not written with hand-built Cypher. `remember_fact` passes the sentence to the same `SimpleKGPipeline`, so the LLM extracts it against the pinned schema and the chunk index is refreshed, exactly how the graph was first built:
+New facts are not written with hand-built Cypher. The store's `add` (called by the `MemoryManager`'s automatic extraction) passes the sentence to the same `SimpleKGPipeline`, so the LLM extracts it against the pinned schema and the chunk index is refreshed, exactly how the graph was first built:
 
 ```python
-@tool
-def remember_fact(sentence: str) -> str:
-    pipeline = gm.build_pipeline(driver, db, embedder=embedder)
-    _run_async(pipeline.run_async(text=sentence))   # LLM extraction, same schema
-    create_vector_index(driver, gm.VECTOR_INDEX_NAME, label=gm.CHUNK_LABEL, ...)
-    return f"Extracted and stored into the graph: {sentence!r}"
+class GraphMemoryStore(MemoryStore):
+    async def add(self, content, metadata=None):
+        pipeline = gm.build_pipeline(self._driver, self._db, embedder=self._embedder)
+        await pipeline.run_async(text=content)          # LLM extraction, same schema
+        create_vector_index(self._driver, gm.VECTOR_INDEX_NAME, label=gm.CHUNK_LABEL, ...)
+        return {"stored": True}
 ```
 
 ---
@@ -252,9 +264,9 @@ The demo already uses the production graph-construction pattern (`SimpleKGPipeli
 
 1. Understand why similarity-only memory fails on multi-hop questions
 2. Let an LLM model agent memory as a knowledge graph (typed nodes, edges, chunk embeddings) with `SimpleKGPipeline` and a pinned schema
-3. Contrast `recall_semantic` vs `recall_graph` on the same text via agentic tests
-4. Plug an external graph store into a full Strands travel agent with just tools + state
-5. Have `remember_fact` grow the graph through the same extraction pipeline that built it
+3. Contrast `mode="semantic"` vs `mode="graph"` on the same text via agentic tests
+4. Wrap a graph store as a native Strands `MemoryStore` and plug it into an agent through the `MemoryManager`
+5. Let automatic extraction grow the graph through the same pipeline that built it
 
 ---
 
